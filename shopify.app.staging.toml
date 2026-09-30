@@ -54,6 +54,5 @@ redirect_urls = [
 
 
 [build]
-include_config_on_deploy = true
 # Staging is a fixed URL, not a dev tunnel — do not auto-update on `shopify app dev`.
 automatically_update_urls_on_dev = false
