@@ -13,21 +13,19 @@ export const loader = async ({ request }) => {
   });
 
   return {
+    shopDomain: process.env.SHOPIFY_SHOP_DOMAIN ?? "",
     orders: orders.map((o) => ({
       id: o.id,
       shopName: o.shopName,
       storeUrl: o.storeUrl,
       channel: o.channel,
-      businessAddress: o.businessAddress,
-      invoiceAddress: o.invoiceAddress,
       currency: o.currency,
       totalUnits: o.totalUnits,
       totalAmount: o.totalAmount,
       isPaid: o.isPaid,
+      shopifyOrderId: o.shopifyOrderId,
       shopifyOrderName: o.shopifyOrderName,
-      paidAt: o.paidAt ? o.paidAt.toISOString() : null,
       createdAt: o.createdAt.toISOString(),
-      itemCount: o.items.length,
     })),
   };
 };
@@ -38,8 +36,11 @@ const money = (cents, currency) =>
 const shortDate = (iso) =>
   new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
+const adminOrderUrl = (shopDomain, orderId) =>
+  shopDomain && orderId ? `https://${shopDomain}/admin/orders/${orderId}` : null;
+
 export default function Index() {
-  const { orders } = useLoaderData();
+  const { orders, shopDomain } = useLoaderData();
   const paidCount = orders.filter((o) => o.isPaid).length;
   const unpaidCount = orders.length - paidCount;
 
@@ -59,24 +60,39 @@ export default function Index() {
               <s-table-header>Total</s-table-header>
               <s-table-header>Paid</s-table-header>
               <s-table-header>Shopify order</s-table-header>
+              <s-table-header>Details</s-table-header>
             </s-table-header-row>
             <s-table-body>
-              {orders.map((o) => (
-                <s-table-row key={o.id}>
-                  <s-table-cell>{shortDate(o.createdAt)}</s-table-cell>
-                  <s-table-cell>{o.shopName}</s-table-cell>
-                  <s-table-cell>{o.storeUrl}</s-table-cell>
-                  <s-table-cell>{o.channel}</s-table-cell>
-                  <s-table-cell>{o.totalUnits}</s-table-cell>
-                  <s-table-cell>{money(o.totalAmount, o.currency)}</s-table-cell>
-                  <s-table-cell>
-                    <s-badge tone={o.isPaid ? "success" : "warning"}>
-                      {o.isPaid ? "Paid" : "Unpaid"}
-                    </s-badge>
-                  </s-table-cell>
-                  <s-table-cell>{o.shopifyOrderName ?? "—"}</s-table-cell>
-                </s-table-row>
-              ))}
+              {orders.map((o) => {
+                const adminUrl = adminOrderUrl(shopDomain, o.shopifyOrderId);
+                return (
+                  <s-table-row key={o.id}>
+                    <s-table-cell>{shortDate(o.createdAt)}</s-table-cell>
+                    <s-table-cell>{o.shopName}</s-table-cell>
+                    <s-table-cell>{o.storeUrl}</s-table-cell>
+                    <s-table-cell>{o.channel}</s-table-cell>
+                    <s-table-cell>{o.totalUnits}</s-table-cell>
+                    <s-table-cell>{money(o.totalAmount, o.currency)}</s-table-cell>
+                    <s-table-cell>
+                      <s-badge tone={o.isPaid ? "success" : "warning"}>
+                        {o.isPaid ? "Paid" : "Unpaid"}
+                      </s-badge>
+                    </s-table-cell>
+                    <s-table-cell>
+                      {adminUrl ? (
+                        <s-link href={adminUrl} target="_blank">
+                          {o.shopifyOrderName ?? `#${o.shopifyOrderId}`}
+                        </s-link>
+                      ) : (
+                        "—"
+                      )}
+                    </s-table-cell>
+                    <s-table-cell>
+                      <s-link href={`/app/orders/${o.id}`}>View</s-link>
+                    </s-table-cell>
+                  </s-table-row>
+                );
+              })}
             </s-table-body>
           </s-table>
         )}

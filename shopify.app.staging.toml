@@ -1,0 +1,59 @@
+client_id = "cca3b701af7d14ec22301d7e329100c8"
+application_url = "https://stg-dogbook-app.vercel.app"
+embedded = true
+name = "stg-dogbook-app"
+
+[access_scopes]
+scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_orders"
+
+[product.metafields.app.demo_info]
+type = "single_line_text_field"
+name = "Demo Source Info"
+description = "Tracks products created by the Shopify app template for development"
+
+  [product.metafields.app.demo_info.access]
+  admin = "merchant_read_write"
+
+[metaobjects.app.example]
+name = "Example"
+description = "An example metaobject definition created by this template"
+
+  [metaobjects.app.example.access]
+  admin = "merchant_read_write"
+
+[metaobjects.app.example.fields.title]
+name = "Title"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.example.fields.description]
+name = "Description"
+type = "multi_line_text_field"
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
+
+[auth]
+redirect_urls = [ 
+  "https://stg-dogbook-app.vercel.app/api/auth",
+  "https://stg-dogbook-app.vercel.app/auth/callback",
+  "https://stg-dogbook-app.vercel.app/api/auth/callback"
+]
+
+
+[build]
+include_config_on_deploy = true
+# Staging is a fixed URL, not a dev tunnel — do not auto-update on `shopify app dev`.
+automatically_update_urls_on_dev = false
