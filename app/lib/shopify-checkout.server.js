@@ -9,11 +9,19 @@ export function numericVariantId(idOrGid) {
 
 export function buildCheckoutUrl(order, lines) {
   const domain = SHOP_DOMAIN();
-  if (!domain) return null;
+  if (!domain) {
+    console.warn(`[wholesale] checkout_url=null: SHOPIFY_SHOP_DOMAIN env var is unset`);
+    return null;
+  }
 
   const linked = lines.filter((l) => l.variant_id);
   const unlinked = lines.filter((l) => !l.variant_id);
-  if (linked.length === 0) return null;
+  if (linked.length === 0) {
+    console.warn(
+      `[wholesale] checkout_url=null: all ${lines.length} lines missing variant_id (attach Shopify products to these breeds: ${unlinked.map((l) => l.handle).join(", ")})`,
+    );
+    return null;
+  }
 
   const cart = linked
     .map((l) => `${numericVariantId(l.variant_id)}:${l.count}`)
