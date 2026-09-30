@@ -5,12 +5,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -31,4 +28,42 @@ model Session {
   emailVerified Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+model WholesaleOrder {
+  id               String   @id @default(cuid())
+  shopName         String
+  storeUrl         String
+  channel          String
+  businessAddress  String
+  invoiceAddress   String
+  currency         String   @default("USD")
+  totalUnits       Int
+  totalAmount      Int
+  isPaid           Boolean  @default(false)
+  shopifyOrderId   String?
+  shopifyOrderName String?
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  items WholesaleOrderItem[]
+
+  @@index([isPaid])
+  @@index([shopifyOrderId])
+}
+
+model WholesaleOrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  handle       String
+  name         String
+  variantId    String?
+  productTitle String?
+  quantity     Int
+  unitPrice    Int
+
+  order WholesaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
