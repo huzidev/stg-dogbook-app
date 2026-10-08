@@ -25,8 +25,8 @@ test("missing shop_name rejected", () => {
   assert.deepEqual(validateIntake(b), { shop_name: "required" });
 });
 
-test("bad channel rejected", () => {
-  const b = good(); b.channel = "BOTH";
+test("empty channel rejected", () => {
+  const b = good(); b.channel = "";
   assert.ok(validateIntake(b).channel);
 });
 

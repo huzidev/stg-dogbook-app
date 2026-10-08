@@ -1,8 +1,16 @@
-const allowed = () =>
-  (process.env.ALLOWED_STOREFRONT_ORIGINS ?? "")
+// ponytail: hardcoded staging origin fallback mirrors middleware.js
+const DEFAULTS = [
+  "https://the-dog-book-171j00mq.myshopify.com",
+  "https://dog-book-wholesale.myshopify.com",
+];
+
+const allowed = () => [
+  ...DEFAULTS,
+  ...(process.env.ALLOWED_STOREFRONT_ORIGINS ?? "")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean),
+];
 
 function originIfAllowed(request) {
   const origin = request.headers.get("origin");

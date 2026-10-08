@@ -2,7 +2,6 @@ import { data } from "react-router";
 import prisma from "../db.server.js";
 import { corsHeaders, preflight } from "../lib/cors.server.js";
 import { validateIntake, toPrismaCreate } from "../lib/wholesale-intake.server.js";
-import { buildCheckoutUrl } from "../lib/shopify-checkout.server.js";
 
 const tag = "[wholesale]";
 
@@ -60,7 +59,8 @@ export async function action({ request }) {
     return data({ error: "Internal error" }, { status: 500, headers: corsHeaders(request) });
   }
 
-  const checkout_url = buildCheckoutUrl(order, body.lines);
-  console.log(`${tag} → 200 order_id=${order.id} checkout_url=${checkout_url ? "set" : "null"}`);
-  return data({ order_id: order.id, checkout_url }, { status: 200, headers: corsHeaders(request) });
+  // ponytail: checkout_url intentionally null until product/variant wiring is finalized.
+  // Theme shows "we'll follow up" state. Re-enable by importing buildCheckoutUrl and calling it here.
+  console.log(`${tag} → 200 order_id=${order.id} checkout_url=null (pending product wiring)`);
+  return data({ order_id: order.id, checkout_url: null }, { status: 200, headers: corsHeaders(request) });
 }

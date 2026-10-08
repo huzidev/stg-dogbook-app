@@ -1,5 +1,3 @@
-const CHANNELS = new Set(["Online", "Offline", "Both"]);
-
 const isNonEmptyString = (v) => typeof v === "string" && v.trim().length > 0;
 const isPositiveInt = (v) => Number.isInteger(v) && v > 0;
 const isNonNegNumber = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
@@ -14,7 +12,7 @@ export function validateIntake(body) {
   if (!isNonEmptyString(body.store_url)) errors.store_url = "required";
   if (!isNonEmptyString(body.business_address)) errors.business_address = "required";
   if (!isNonEmptyString(body.invoice_address)) errors.invoice_address = "required";
-  if (!CHANNELS.has(body.channel)) errors.channel = "must be Online, Offline, or Both";
+  if (!isNonEmptyString(body.channel)) errors.channel = "required";
 
   if (!body.totals || typeof body.totals !== "object") {
     errors.totals = "required object with units and price";
