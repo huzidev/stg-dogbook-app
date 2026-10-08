@@ -1,0 +1,11 @@
+name = "wholesale-post-purchase"
+type = "checkout_post_purchase"
+uid = "e59d7c35-ed2d-7755-b21f-deff885df4d4d293212c"
+
+# [[metafields]]
+# namespace = "my-namespace"
+# key = "my-key"
+
+# [[metafields]]
+# namespace = "my-namespace"
+# key = "my-key-2"
