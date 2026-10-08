@@ -3,6 +3,7 @@ import {
   extend,
   render,
   useExtensionInput,
+  Banner,
   BlockStack,
   Button,
   ButtonGroup,
@@ -11,10 +12,8 @@ import {
   Image,
   InlineStack,
   Layout,
-  MoneyLine,
-  MoneySummary,
   Separator,
-  Tag,
+  Text,
   TextBlock,
   TextContainer,
   Tiles,
@@ -151,9 +150,27 @@ export function App() {
   const savings = showDiscount
     ? (Number(originalPrice) - Number(discountedPrice)).toFixed(2)
     : null;
-  const money = (amount) => ({ amount: Number(amount), currencyCode });
+  const fmt = (amount) =>
+    `${currencyCode} ${Number(amount ?? 0).toFixed(2)}`;
 
   const hasImage = Boolean(offer.imageUrl);
+
+  const PriceRow = ({ label, value, strike, emphasized, appearance }) => (
+    <InlineStack spacing="tight" alignment="leading">
+      <View inlineAlignment="leading">
+        <Text subdued={!emphasized}>{label}</Text>
+      </View>
+      <View inlineAlignment="trailing">
+        <Text
+          emphasized={emphasized}
+          appearance={appearance}
+          role={strike ? { tag: "s" } : undefined}
+        >
+          {value}
+        </Text>
+      </View>
+    </InlineStack>
+  );
 
   const Content = (
     <BlockStack spacing="loose">
@@ -161,48 +178,60 @@ export function App() {
         <InlineStack spacing="tight" alignment="leading">
           <Heading level={2}>{offer.productTitle}</Heading>
           {showDiscount && (
-            <Tag>
+            <Text emphasized appearance="success">
               Save {offer.discount.value}
               {offer.discount.valueType === "percentage" ? "%" : ""}
-            </Tag>
+            </Text>
           )}
         </InlineStack>
-        <TextBlock appearance="subdued">{offer.description}</TextBlock>
+        <TextBlock subdued>{offer.description}</TextBlock>
       </BlockStack>
 
       <Separator />
 
       <BlockStack spacing="tight">
         {showDiscount && (
-          <MoneyLine label="Regular price" amount={money(originalPrice)} />
+          <PriceRow
+            label="Regular price"
+            value={fmt(originalPrice)}
+            strike
+          />
         )}
-        <MoneyLine
+        <PriceRow
           label={showDiscount ? "Your price" : "Price"}
-          amount={money(discountedPrice ?? originalPrice ?? 0)}
+          value={fmt(discountedPrice ?? originalPrice)}
+          emphasized
         />
         {savings && (
-          <TextBlock appearance="success" emphasized>
-            You save {currencyCode} {savings}
-          </TextBlock>
+          <PriceRow
+            label="You save"
+            value={fmt(savings)}
+            emphasized
+            appearance="success"
+          />
         )}
       </BlockStack>
 
       {total != null && (
-        <MoneySummary
-          label="New order total"
-          amount={money(total)}
-        />
+        <>
+          <Separator />
+          <PriceRow
+            label="New order total"
+            value={fmt(total)}
+            emphasized
+          />
+        </>
       )}
 
       {error && (
-        <CalloutBanner title="Something went wrong">
+        <Banner status="critical" title="Something went wrong">
           <TextBlock>{error}</TextBlock>
-        </CalloutBanner>
+        </Banner>
       )}
 
       <ButtonGroup>
         <Button submit onPress={accept} loading={submitting}>
-          Pay now · {currencyCode} {Number(discountedPrice ?? 0).toFixed(2)}
+          Pay now · {fmt(discountedPrice ?? 0)}
         </Button>
         <Button plain onPress={decline} disabled={submitting}>
           No thanks, continue to confirmation
