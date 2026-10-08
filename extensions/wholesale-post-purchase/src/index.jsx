@@ -40,12 +40,12 @@ const offerToChanges = (offer) => [
   },
 ];
 
-const fetchOffer = async (shopDomain) => {
+const fetchOffer = async (shopDomain, productIds) => {
   if (!shopDomain) return null;
+  const params = new URLSearchParams({ shop: shopDomain });
+  if (productIds.length) params.set("product_ids", productIds.join(","));
   try {
-    const res = await fetch(
-      `${APP_URL}/api/post-purchase/offer?shop=${encodeURIComponent(shopDomain)}`,
-    );
+    const res = await fetch(`${APP_URL}/api/post-purchase/offer?${params.toString()}`);
     if (!res.ok) return null;
     const body = await res.json();
     return body?.offer ?? null;
@@ -56,9 +56,16 @@ const fetchOffer = async (shopDomain) => {
   }
 };
 
+const extractProductIds = (initialPurchase) =>
+  (initialPurchase?.lineItems ?? [])
+    .map((li) => li?.product?.id)
+    .filter((id) => id != null)
+    .map(String);
+
 extend("Checkout::PostPurchase::ShouldRender", async ({ inputData, storage }) => {
   const shopDomain = inputData?.shop?.domain;
-  const offer = await fetchOffer(shopDomain);
+  const productIds = extractProductIds(inputData?.initialPurchase);
+  const offer = await fetchOffer(shopDomain, productIds);
   if (!offer?.variantId) return { render: false };
   await storage.update({ offer });
   return { render: true };

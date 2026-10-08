@@ -215,5 +215,12 @@ curl -X POST https://<staging-host>/api/post-purchase/sign -i | head -1
 - Modified: `app/routes/app.jsx` — added `s-link href="/app/post-purchase"` nav entry
 - Risk to wholesale flow: **none** — new embedded page under `/app`, uses the same `authenticate.admin(request)` as the baseline. Variant selection uses App Bridge's `window.shopify.resourcePicker` (no new deps).
 
-### Step 7+ — TBD
+### Step 7 — Metaobject multi-offer with trigger rules (Part B of three)
+- Added metaobject `app--post_purchase_offer` to both pp-local and pp-staging tomls with fields: `offer` (json, required), `trigger_product` (product_reference, optional), `priority` (number_integer), `enabled` (boolean)
+- Modified: `app/routes/api.post-purchase.offer.jsx` — resolver now (1) queries metaobject entries, filters by `enabled` + trigger product match (empty trigger = applies to all), picks highest priority; (2) falls back to shop metafield (A) when no metaobject match. Response includes `source: "metaobject"|"metafield"` for debugging.
+- Modified: `extensions/wholesale-post-purchase/src/index.jsx` — `ShouldRender` now also sends `product_ids` (from `initialPurchase.lineItems[].product.id`) to the offer endpoint for trigger matching.
+- Risk to wholesale flow: **none** — all additive. Metafield fallback (A) still works when no metaobject entries exist.
+- Merchant workflow: Admin → Content → Metaobjects → Post-purchase offer → Add entry. Set the `offer` JSON (same shape as the metafield), optionally pick a trigger product, set priority and enabled.
+
+### Step 8+ — TBD
 - Fill in as each step lands

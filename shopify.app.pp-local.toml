@@ -53,6 +53,36 @@ required = true
 name = "Description"
 type = "multi_line_text_field"
 
+# Post-purchase offers (multiple, with optional trigger product + priority).
+# When any enabled entry matches, it wins over the single shop metafield fallback.
+[metaobjects.app.post_purchase_offer]
+name = "Post-purchase offer"
+description = "An offer shown on the post-purchase page. Multiple offers allowed; priority breaks ties. Trigger product is optional; empty means the offer applies to any order."
+
+  [metaobjects.app.post_purchase_offer.access]
+  admin = "merchant_read_write"
+
+[metaobjects.app.post_purchase_offer.fields.offer]
+name = "Offer JSON"
+type = "json"
+description = "{variantId:number, quantity:number, productTitle:string, description:string, imageUrl:string|null, discount:{value:number,valueType:'percentage'|'fixed_amount',title:string}}"
+required = true
+
+[metaobjects.app.post_purchase_offer.fields.trigger_product]
+name = "Trigger product"
+type = "product_reference"
+description = "If set, this offer only shows when the buyer purchased this product. Leave empty to apply to all orders."
+
+[metaobjects.app.post_purchase_offer.fields.priority]
+name = "Priority"
+type = "number_integer"
+description = "Higher wins when multiple offers match. Default 0."
+
+[metaobjects.app.post_purchase_offer.fields.enabled]
+name = "Enabled"
+type = "boolean"
+description = "Uncheck to hide this offer without deleting it."
+
 [webhooks]
 api_version = "2026-10"
 
