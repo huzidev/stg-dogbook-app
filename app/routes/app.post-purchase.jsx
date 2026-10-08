@@ -147,97 +147,112 @@ export default function PostPurchaseSettings() {
 
   return (
     <s-page heading="Post-purchase offer">
-      <s-section heading="Offer configuration">
-        <s-paragraph>
-          Shown to buyers on the thank-you page after their initial payment. Leave the variant
-          empty to disable the extension — it will quietly not render.
-        </s-paragraph>
+      <s-paragraph>
+        Shown to buyers on the thank-you page after their initial payment. Leave the variant
+        empty to disable the extension — it will quietly not render.
+      </s-paragraph>
 
-        {actionData?.ok && (
-          <s-banner tone="success">Saved. The checkout extension will pick this up on the next order.</s-banner>
-        )}
-        {actionData?.ok === false && (
-          <s-banner tone="critical" heading="Could not save">{actionData.error}</s-banner>
-        )}
+      {actionData?.ok && (
+        <s-banner tone="success">
+          Saved. The checkout extension will pick this up on the next order.
+        </s-banner>
+      )}
+      {actionData?.ok === false && (
+        <s-banner tone="critical" heading="Could not save">
+          {actionData.error}
+        </s-banner>
+      )}
 
-        <Form method="post">
-          <input type="hidden" name="shopGid" value={shopGid ?? ""} />
+      <Form method="post">
+        <input type="hidden" name="shopGid" value={shopGid ?? ""} />
 
-          <s-stack direction="block" gap="loose">
-            <s-stack direction="block" gap="tight">
+        <s-stack direction="block" gap="large-300">
+          <s-section heading="Product">
+            <s-stack direction="block" gap="base">
+              <s-grid gridTemplateColumns="minmax(0, 1fr) auto" gap="base" alignItems="end">
+                <s-text-field
+                  label="Variant ID"
+                  details="Numeric ID of the product variant to offer."
+                  name="variantId"
+                  value={variantId}
+                  onInput={(e) => setVariantId(e.currentTarget.value)}
+                  required
+                ></s-text-field>
+                {pickerReady && (
+                  <s-button type="button" onClick={pickVariant}>
+                    Browse products
+                  </s-button>
+                )}
+              </s-grid>
+
+              <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+                <s-text-field
+                  label="Product title"
+                  details="Shown to the buyer on the offer page."
+                  name="productTitle"
+                  value={productTitle}
+                  onInput={(e) => setProductTitle(e.currentTarget.value)}
+                ></s-text-field>
+                <s-number-field
+                  label="Quantity"
+                  name="quantity"
+                  min="1"
+                  defaultValue={String(offer.quantity ?? 1)}
+                ></s-number-field>
+              </s-grid>
+
+              <s-text-area
+                label="Description"
+                name="description"
+                rows="3"
+                defaultValue={offer.description ?? ""}
+              ></s-text-area>
+
               <s-text-field
-                label="Variant ID (numeric)"
-                name="variantId"
-                value={variantId}
-                onInput={(e) => setVariantId(e.currentTarget.value)}
-                required
+                label="Image URL"
+                details="Optional. Use the Shopify CDN URL from the product image."
+                name="imageUrl"
+                value={imageUrl}
+                onInput={(e) => setImageUrl(e.currentTarget.value)}
               ></s-text-field>
-              {pickerReady && (
-                <s-button type="button" onClick={pickVariant}>
-                  Browse products…
-                </s-button>
-              )}
             </s-stack>
+          </s-section>
 
-            <s-number-field
-              label="Quantity"
-              name="quantity"
-              min="1"
-              defaultValue={String(offer.quantity ?? 1)}
-            ></s-number-field>
+          <s-section heading="Discount">
+            <s-stack direction="block" gap="base">
+              <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+                <s-number-field
+                  label="Value"
+                  name="discountValue"
+                  min="0"
+                  defaultValue={String(offer.discount?.value ?? 10)}
+                ></s-number-field>
+                <s-select
+                  label="Type"
+                  name="discountType"
+                  defaultValue={offer.discount?.valueType ?? "percentage"}
+                >
+                  <s-option value="percentage">Percentage (%)</s-option>
+                  <s-option value="fixed_amount">Fixed amount</s-option>
+                </s-select>
+              </s-grid>
 
-            <s-text-field
-              label="Product title (shown to buyer)"
-              name="productTitle"
-              value={productTitle}
-              onInput={(e) => setProductTitle(e.currentTarget.value)}
-            ></s-text-field>
-
-            <s-text-area
-              label="Description"
-              name="description"
-              rows="3"
-              defaultValue={offer.description ?? ""}
-            ></s-text-area>
-
-            <s-text-field
-              label="Image URL (optional)"
-              name="imageUrl"
-              value={imageUrl}
-              onInput={(e) => setImageUrl(e.currentTarget.value)}
-            ></s-text-field>
-
-            <s-stack direction="inline" gap="base">
-              <s-number-field
-                label="Discount value"
-                name="discountValue"
-                min="0"
-                defaultValue={String(offer.discount?.value ?? 10)}
-              ></s-number-field>
-              <s-select
-                label="Discount type"
-                name="discountType"
-                defaultValue={offer.discount?.valueType ?? "percentage"}
-              >
-                <s-option value="percentage">Percentage (%)</s-option>
-                <s-option value="fixed_amount">Fixed amount</s-option>
-              </s-select>
+              <s-text-field
+                label="Label"
+                details="Shown next to the price on the offer page."
+                name="discountTitle"
+                defaultValue={offer.discount?.title ?? "Post-purchase discount"}
+              ></s-text-field>
             </s-stack>
+          </s-section>
 
-            <s-text-field
-              label="Discount label (shown next to the price)"
-              name="discountTitle"
-              defaultValue={offer.discount?.title ?? "Post-purchase discount"}
-            ></s-text-field>
-
-            <s-stack direction="inline" gap="base">
-              <s-button type="submit" variant="primary" loading={submitting || undefined}>
-                Save offer
-              </s-button>
-            </s-stack>
+          <s-stack direction="inline" gap="base" justifyContent="end">
+            <s-button type="submit" variant="primary" loading={submitting || undefined}>
+              Save offer
+            </s-button>
           </s-stack>
-        </Form>
-      </s-section>
+        </s-stack>
+      </Form>
     </s-page>
   );
 }
