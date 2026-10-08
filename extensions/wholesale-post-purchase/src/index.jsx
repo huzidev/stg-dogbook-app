@@ -18,29 +18,11 @@ import {
 } from "@shopify/post-purchase-ui-extensions-react";
 
 // =====================================================================
-// Configure before testing. See docs/plan/07-post-purchase-extension.md
-// §12 for the open client questions driving these values.
+// Offer source: shop metafield `app.post_purchase_offer`, resolved via
+// GET /api/post-purchase/offer?shop=<domain>. Merchant edits it in
+// Shopify Admin → Settings → Custom data → Shop (or via the embedded
+// app settings page). See docs/plan/07-post-purchase-extension.md.
 // =====================================================================
-
-// ponytail: hardcoded offer. When the client confirms dynamic rules,
-// `ShouldRender` will POST to /api/post-purchase/offer instead.
-const OFFER = {
-  variantId: 67594204676249, // Cane Corso (dev store)
-  quantity: 1,
-  productTitle: "Cane Corso",
-  description:
-    "Add a Cane Corso to your order with a one-time post-purchase discount.",
-  // TODO: swap for the real product image URL from admin → Products → Cane Corso
-  // → right-click the featured image → "Copy image address". Keep the Shopify CDN
-  // URL (starts with https://cdn.shopify.com/...). Leave null to hide the image.
-  imageUrl:
-    "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&h=600&fit=crop&q=80",
-  discount: {
-    value: 10,
-    valueType: "percentage",
-    title: "Post-purchase 10% off",
-  },
-};
 
 // TODO per environment:
 //   local dev: paste the `shopify app dev` tunnel URL printed by the CLI
@@ -53,13 +35,32 @@ const offerToChanges = (offer) => [
   {
     type: "add_variant",
     variantId: offer.variantId,
-    quantity: offer.quantity,
+    quantity: offer.quantity ?? 1,
     discount: offer.discount,
   },
 ];
 
-extend("Checkout::PostPurchase::ShouldRender", async ({ storage }) => {
-  await storage.update({ offer: OFFER });
+const fetchOffer = async (shopDomain) => {
+  if (!shopDomain) return null;
+  try {
+    const res = await fetch(
+      `${APP_URL}/api/post-purchase/offer?shop=${encodeURIComponent(shopDomain)}`,
+    );
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body?.offer ?? null;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[post-purchase] fetchOffer failed", err);
+    return null;
+  }
+};
+
+extend("Checkout::PostPurchase::ShouldRender", async ({ inputData, storage }) => {
+  const shopDomain = inputData?.shop?.domain;
+  const offer = await fetchOffer(shopDomain);
+  if (!offer?.variantId) return { render: false };
+  await storage.update({ offer });
   return { render: true };
 });
 
@@ -69,7 +70,8 @@ export function App() {
   const { storage, inputData, calculateChangeset, applyChangeset, done } =
     useExtensionInput();
 
-  const offer = storage.initialData?.offer ?? OFFER;
+  // storage.initialData.offer is set in ShouldRender — if we got here it exists.
+  const offer = storage.initialData.offer;
   const changes = offerToChanges(offer);
 
   const [calc, setCalc] = useState(null);

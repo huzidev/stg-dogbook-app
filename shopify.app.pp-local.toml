@@ -29,6 +29,14 @@ description = "Tracks products created by the Shopify app template for developme
   [product.metafields.app.demo_info.access]
   admin = "merchant_read_write"
 
+[shop.metafields.app.post_purchase_offer]
+type = "json"
+name = "Post-purchase offer"
+description = "Single-offer config for the post-purchase extension. JSON: {variantId:number, quantity:number, productTitle:string, description:string, imageUrl:string|null, discount:{value:number,valueType:'percentage'|'fixed_amount',title:string}}"
+
+  [shop.metafields.app.post_purchase_offer.access]
+  admin = "merchant_read_write"
+
 [metaobjects.app.example]
 name = "Example"
 description = "An example metaobject definition created by this template"

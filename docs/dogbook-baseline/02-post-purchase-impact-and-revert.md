@@ -203,5 +203,12 @@ curl -X POST https://<staging-host>/api/post-purchase/sign -i | head -1
 - Risk to wholesale flow: **none** — extension runtime is isolated to Shopify's checkout flow
 - **Still to configure before running:** hardcoded `OFFER.variantId` (TODO at top of file) and `APP_URL` (local-dev needs the `shopify app dev` tunnel URL; staging default already set)
 
+### Step 5 — Offer source: shop metafield (Part A of three)
+- Added: `app/routes/api.post-purchase.offer.jsx` — GET endpoint reading `shop.metafield(namespace:"app", key:"post_purchase_offer")` via Admin GraphQL (public read, CORS open; returns `{offer:null}` when unset)
+- Modified: `shopify.app.pp-local.toml`, `shopify.app.pp-staging.toml` — new `[shop.metafields.app.post_purchase_offer]` JSON metafield definition
+- Modified: `extensions/wholesale-post-purchase/src/index.jsx` — removed hardcoded `OFFER`; `ShouldRender` fetches `/api/post-purchase/offer?shop=<domain>`, returns `{render:false}` when metafield unset or invalid
+- Risk to wholesale flow: **none** — new independent endpoint, no shared state. Scopes unchanged (app-owned shop metafields are readable by the owning app).
+- Operational note: after deploy the metafield is empty → extension does not render. Merchant seeds it manually (Admin → Settings → Custom data → Shop → Post-purchase offer) OR waits for Part C (embedded settings page).
+
 ### Step 5+ — TBD
 - Fill in as each step lands
