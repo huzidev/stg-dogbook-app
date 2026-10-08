@@ -210,5 +210,10 @@ curl -X POST https://<staging-host>/api/post-purchase/sign -i | head -1
 - Risk to wholesale flow: **none** — new independent endpoint, no shared state. Scopes unchanged (app-owned shop metafields are readable by the owning app).
 - Operational note: after deploy the metafield is empty → extension does not render. Merchant seeds it manually (Admin → Settings → Custom data → Shop → Post-purchase offer) OR waits for Part C (embedded settings page).
 
-### Step 5+ — TBD
+### Step 6 — Embedded settings page (Part C of three)
+- Added: `app/routes/app.post-purchase.jsx` — Polaris web-component form; loader reads shop metafield via Admin GraphQL, action writes via `metafieldsSet`
+- Modified: `app/routes/app.jsx` — added `s-link href="/app/post-purchase"` nav entry
+- Risk to wholesale flow: **none** — new embedded page under `/app`, uses the same `authenticate.admin(request)` as the baseline. Variant selection uses App Bridge's `window.shopify.resourcePicker` (no new deps).
+
+### Step 7+ — TBD
 - Fill in as each step lands
