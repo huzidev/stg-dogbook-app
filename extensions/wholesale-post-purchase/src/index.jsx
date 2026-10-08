@@ -30,9 +30,11 @@ const OFFER = {
   productTitle: "Cane Corso",
   description:
     "Add a Cane Corso to your order with a one-time post-purchase discount.",
-  // TODO: paste a real product image URL (admin → Products → Cane Corso → copy image URL).
-  // Leave null to render a cleaner, image-less layout.
-  imageUrl: null,
+  // TODO: swap for the real product image URL from admin → Products → Cane Corso
+  // → right-click the featured image → "Copy image address". Keep the Shopify CDN
+  // URL (starts with https://cdn.shopify.com/...). Leave null to hide the image.
+  imageUrl:
+    "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&h=600&fit=crop&q=80",
   discount: {
     value: 10,
     valueType: "percentage",
