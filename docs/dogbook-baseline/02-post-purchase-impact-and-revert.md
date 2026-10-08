@@ -186,5 +186,22 @@ curl -X POST https://<staging-host>/api/post-purchase/sign -i | head -1
 - Will modify: `shopify.app.toml`, `package-lock.json`
 - Risk to wholesale flow: **low** — `shopify.app.toml` edit is the only shared file; keep diff reviewable before commit
 
-### Step 4+ — TBD
+### Step 2.5 — npm cleanup after scaffold
+- Modified: `package.json` (removed `packageManager: pnpm@...` field added by scaffold)
+- Deleted: `pnpm-lock.yaml` (untracked, created by scaffold)
+- Left alone: `pnpm-workspace.yaml` (pre-existing in repo; npm ignores it)
+- Risk to wholesale flow: **none** — pure tooling tidy
+
+### Step 3 — Extension scaffold
+- Added: `extensions/wholesale-post-purchase/` (shopify.extension.toml + package.json + src/index.jsx stub)
+- Modified: none in baseline (CLI's config prompt doesn't rewrite `shopify.app.toml`)
+- Risk to wholesale flow: **none** — isolated under `extensions/`
+
+### Step 4 — Real extension code
+- Replaced: `extensions/wholesale-post-purchase/src/index.jsx` (scaffold boilerplate → working ShouldRender + Render wired to `/api/post-purchase/sign`)
+- Modified: none
+- Risk to wholesale flow: **none** — extension runtime is isolated to Shopify's checkout flow
+- **Still to configure before running:** hardcoded `OFFER.variantId` (TODO at top of file) and `APP_URL` (local-dev needs the `shopify app dev` tunnel URL; staging default already set)
+
+### Step 5+ — TBD
 - Fill in as each step lands
