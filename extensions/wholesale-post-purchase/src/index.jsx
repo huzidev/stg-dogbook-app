@@ -22,11 +22,11 @@ import {
 // ponytail: hardcoded offer. When the client confirms dynamic rules,
 // `ShouldRender` will POST to /api/post-purchase/offer instead.
 const OFFER = {
-  variantId: 44123456789012, // TODO: real variant ID from the dev store
+  variantId: 67594204676249, // Cane Corso (dev store)
   quantity: 1,
-  productTitle: "Wholesale starter kit",
+  productTitle: "Cane Corso",
   description:
-    "Add our starter kit to your order — one-time offer at this price.",
+    "Add a Cane Corso to your order with a one-time post-purchase discount.",
   imageUrl:
     "https://cdn.shopify.com/static/images/examples/img-placeholder-1120x1120.png",
   discount: {
