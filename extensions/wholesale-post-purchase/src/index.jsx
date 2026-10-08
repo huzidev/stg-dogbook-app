@@ -237,33 +237,25 @@ export function App() {
   );
 
   return (
-    <BlockStack spacing="xloose">
-      <CalloutBanner title="One more thing before you go">
-        <TextBlock>
-          Add this to your order — no extra shipping, same confirmation email.
-        </TextBlock>
-      </CalloutBanner>
+    <Layout maxInlineSize={560}>
+      <BlockStack spacing="loose">
+        <CalloutBanner title="One more thing before you go">
+          <TextBlock>
+            Add this to your order — no extra shipping, same confirmation email.
+          </TextBlock>
+        </CalloutBanner>
 
-      {hasImage ? (
-        <Layout
-          maxInlineSize={760}
-          media={[
-            { viewportSize: "small", maxInlineSize: 0.95, sizes: ["fill"] },
-            { viewportSize: "medium", maxInlineSize: 720, sizes: [200, "fill"] },
-            { viewportSize: "large", maxInlineSize: 760, sizes: [240, "fill"] },
-          ]}
-        >
+        {hasImage && (
           <Image
             source={offer.imageUrl}
             description={offer.productTitle}
-            aspectRatio={1}
+            aspectRatio={1.6}
             fit="cover"
           />
-          {Content}
-        </Layout>
-      ) : (
-        <Layout maxInlineSize={620}>{Content}</Layout>
-      )}
-    </BlockStack>
+        )}
+
+        {Content}
+      </BlockStack>
+    </Layout>
   );
 }
