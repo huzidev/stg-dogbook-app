@@ -246,14 +246,19 @@ export function App() {
 
       {hasImage ? (
         <Layout
-          maxInlineSize={0.95}
+          maxInlineSize={760}
           media={[
-            { viewportSize: "small", sizes: ["fill"] },
-            { viewportSize: "medium", sizes: [220, "fill"] },
-            { viewportSize: "large", sizes: [260, "fill"] },
+            { viewportSize: "small", maxInlineSize: 0.95, sizes: ["fill"] },
+            { viewportSize: "medium", maxInlineSize: 720, sizes: [200, "fill"] },
+            { viewportSize: "large", maxInlineSize: 760, sizes: [240, "fill"] },
           ]}
         >
-          <Image source={offer.imageUrl} description={offer.productTitle} />
+          <Image
+            source={offer.imageUrl}
+            description={offer.productTitle}
+            aspectRatio={1}
+            fit="cover"
+          />
           {Content}
         </Layout>
       ) : (
