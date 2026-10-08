@@ -5,12 +5,19 @@ import {
   useExtensionInput,
   BlockStack,
   Button,
+  ButtonGroup,
   CalloutBanner,
   Heading,
   Image,
+  InlineStack,
   Layout,
+  MoneyLine,
+  MoneySummary,
+  Separator,
+  Tag,
   TextBlock,
   TextContainer,
+  Tiles,
   View,
 } from "@shopify/post-purchase-ui-extensions-react";
 
@@ -27,8 +34,9 @@ const OFFER = {
   productTitle: "Cane Corso",
   description:
     "Add a Cane Corso to your order with a one-time post-purchase discount.",
-  imageUrl:
-    "https://cdn.shopify.com/static/images/examples/img-placeholder-1120x1120.png",
+  // TODO: paste a real product image URL (admin → Products → Cane Corso → copy image URL).
+  // Leave null to render a cleaner, image-less layout.
+  imageUrl: null,
   discount: {
     value: 10,
     valueType: "percentage",
@@ -130,74 +138,104 @@ export function App() {
     );
   }
 
-  const money = (amount, currency) =>
-    amount == null
-      ? "—"
-      : `${currency ?? ""} ${Number(amount).toFixed(2)}`.trim();
-
   const presentment = calc?.totalOutstandingSet?.presentmentMoney;
-  const currency = presentment?.currencyCode;
+  const currencyCode = presentment?.currencyCode ?? "USD";
   const total = presentment?.amount;
   const line = calc?.updatedLineItems?.[0];
   const originalPrice = line?.priceSet?.presentmentMoney?.amount;
   const discountedPrice = line?.totalPriceSet?.presentmentMoney?.amount;
   const showDiscount =
-    originalPrice && discountedPrice && originalPrice !== discountedPrice;
+    originalPrice != null &&
+    discountedPrice != null &&
+    Number(originalPrice) !== Number(discountedPrice);
+  const savings = showDiscount
+    ? (Number(originalPrice) - Number(discountedPrice)).toFixed(2)
+    : null;
+  const money = (amount) => ({ amount: Number(amount), currencyCode });
+
+  const hasImage = Boolean(offer.imageUrl);
+
+  const Content = (
+    <BlockStack spacing="loose">
+      <BlockStack spacing="tight">
+        <InlineStack spacing="tight" alignment="leading">
+          <Heading level={2}>{offer.productTitle}</Heading>
+          {showDiscount && (
+            <Tag>
+              Save {offer.discount.value}
+              {offer.discount.valueType === "percentage" ? "%" : ""}
+            </Tag>
+          )}
+        </InlineStack>
+        <TextBlock appearance="subdued">{offer.description}</TextBlock>
+      </BlockStack>
+
+      <Separator />
+
+      <BlockStack spacing="tight">
+        {showDiscount && (
+          <MoneyLine label="Regular price" amount={money(originalPrice)} />
+        )}
+        <MoneyLine
+          label={showDiscount ? "Your price" : "Price"}
+          amount={money(discountedPrice ?? originalPrice ?? 0)}
+        />
+        {savings && (
+          <TextBlock appearance="success" emphasized>
+            You save {currencyCode} {savings}
+          </TextBlock>
+        )}
+      </BlockStack>
+
+      {total != null && (
+        <MoneySummary
+          label="New order total"
+          amount={money(total)}
+        />
+      )}
+
+      {error && (
+        <CalloutBanner title="Something went wrong">
+          <TextBlock>{error}</TextBlock>
+        </CalloutBanner>
+      )}
+
+      <ButtonGroup>
+        <Button submit onPress={accept} loading={submitting}>
+          Pay now · {currencyCode} {Number(discountedPrice ?? 0).toFixed(2)}
+        </Button>
+        <Button plain onPress={decline} disabled={submitting}>
+          No thanks, continue to confirmation
+        </Button>
+      </ButtonGroup>
+    </BlockStack>
+  );
 
   return (
-    <BlockStack spacing="loose">
-      <CalloutBanner title="One more thing before you go">
+    <BlockStack spacing="xloose">
+      <CalloutBanner title="One more thing before you go" alignment="center">
         <TextBlock>
-          Add this to your order with no additional shipping cost.
+          Add this to your order — no extra shipping, same confirmation email.
         </TextBlock>
       </CalloutBanner>
 
-      <Layout
-        maxInlineSize={0.95}
-        media={[
-          { viewportSize: "small", sizes: [1, 30, 1] },
-          { viewportSize: "medium", sizes: [300, 30, 0.5] },
-          { viewportSize: "large", sizes: [400, 30, 0.33] },
-        ]}
-      >
-        <View>
-          <Image source={offer.imageUrl} />
-        </View>
-        <View />
-        <BlockStack spacing="xloose">
-          <TextContainer>
-            <Heading>{offer.productTitle}</Heading>
-            <TextBlock>{offer.description}</TextBlock>
-          </TextContainer>
-
-          <BlockStack spacing="tight">
-            {showDiscount && (
-              <TextBlock>
-                Was {money(originalPrice, currency)}, now{" "}
-                {money(discountedPrice, currency)}
-              </TextBlock>
-            )}
-            {total && (
-              <TextBlock>
-                Order total if accepted: {money(total, currency)}
-              </TextBlock>
-            )}
-          </BlockStack>
-
-          {error && (
-            <CalloutBanner title="Problem">
-              <TextBlock>{error}</TextBlock>
-            </CalloutBanner>
-          )}
-
-          <Button submit onPress={accept} loading={submitting}>
-            Add to my order
-          </Button>
-          <Button plain onPress={decline} disabled={submitting}>
-            No thanks
-          </Button>
-        </BlockStack>
-      </Layout>
+      {hasImage ? (
+        <Tiles
+          maxInlineSize={0.95}
+          media={[
+            { viewportSize: "small", sizes: [1] },
+            { viewportSize: "medium", sizes: [220, 0.6] },
+            { viewportSize: "large", sizes: [260, 0.6] },
+          ]}
+        >
+          <View>
+            <Image source={offer.imageUrl} description={offer.productTitle} />
+          </View>
+          <View>{Content}</View>
+        </Tiles>
+      ) : (
+        <View maxInlineSize={620}>{Content}</View>
+      )}
     </BlockStack>
   );
 }
