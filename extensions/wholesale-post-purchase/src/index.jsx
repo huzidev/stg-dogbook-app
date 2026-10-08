@@ -15,9 +15,6 @@ import {
   Separator,
   Text,
   TextBlock,
-  TextContainer,
-  Tiles,
-  View,
 } from "@shopify/post-purchase-ui-extensions-react";
 
 // =====================================================================
@@ -155,21 +152,18 @@ export function App() {
 
   const hasImage = Boolean(offer.imageUrl);
 
+  // Layout with sizes ['fill', 'auto'] → label fills remaining space, value hugs right.
   const PriceRow = ({ label, value, strike, emphasized, appearance }) => (
-    <InlineStack spacing="tight" alignment="leading">
-      <View inlineAlignment="leading">
-        <Text subdued={!emphasized}>{label}</Text>
-      </View>
-      <View inlineAlignment="trailing">
-        <Text
-          emphasized={emphasized}
-          appearance={appearance}
-          role={strike ? { tag: "s" } : undefined}
-        >
-          {value}
-        </Text>
-      </View>
-    </InlineStack>
+    <Layout sizes={["fill", "auto"]}>
+      <Text subdued={!emphasized}>{label}</Text>
+      <Text
+        emphasized={emphasized}
+        appearance={appearance}
+        role={strike ? "deletion" : undefined}
+      >
+        {value}
+      </Text>
+    </Layout>
   );
 
   const Content = (
@@ -242,28 +236,26 @@ export function App() {
 
   return (
     <BlockStack spacing="xloose">
-      <CalloutBanner title="One more thing before you go" alignment="center">
+      <CalloutBanner title="One more thing before you go">
         <TextBlock>
           Add this to your order — no extra shipping, same confirmation email.
         </TextBlock>
       </CalloutBanner>
 
       {hasImage ? (
-        <Tiles
+        <Layout
           maxInlineSize={0.95}
           media={[
-            { viewportSize: "small", sizes: [1] },
-            { viewportSize: "medium", sizes: [220, 0.6] },
-            { viewportSize: "large", sizes: [260, 0.6] },
+            { viewportSize: "small", sizes: ["fill"] },
+            { viewportSize: "medium", sizes: [220, "fill"] },
+            { viewportSize: "large", sizes: [260, "fill"] },
           ]}
         >
-          <View>
-            <Image source={offer.imageUrl} description={offer.productTitle} />
-          </View>
-          <View>{Content}</View>
-        </Tiles>
+          <Image source={offer.imageUrl} description={offer.productTitle} />
+          {Content}
+        </Layout>
       ) : (
-        <View maxInlineSize={620}>{Content}</View>
+        <Layout maxInlineSize={620}>{Content}</Layout>
       )}
     </BlockStack>
   );
