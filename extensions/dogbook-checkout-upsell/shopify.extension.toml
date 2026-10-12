@@ -3,6 +3,7 @@ api_version = "2024-10"
 [[extensions]]
 name = "dogbook-checkout-upsell"
 handle = "dogbook-checkout-upsell"
+uid = "754c94ea-48e6-70a5-f75a-6521782fcbec76beb76a"
 type = "ui_extension"
 
   [[extensions.targeting]]

@@ -10,7 +10,6 @@ import {
   Image,
   InlineStack,
   Layout,
-  Pressable,
   Separator,
   Text,
   TextBlock,
@@ -169,9 +168,9 @@ export function App() {
           )}
           <TrustRow />
           <View inlineAlignment="center">
-            <Pressable onPress={() => setState("declined")}>
-              <Text appearance="subdued">No thanks</Text>
-            </Pressable>
+            <Button plain onPress={() => setState("declined")}>
+              No thanks
+            </Button>
           </View>
         </BlockStack>
       </View>
@@ -249,40 +248,43 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
   const canNext = selectedIdx < offers.length - 1;
   return (
     <BlockStack spacing="tight">
+      {/* ponytail: @shopify/post-purchase-ui-extensions-react 0.13.x doesn't
+          export Pressable, so tiles are non-interactive. Selection is driven
+          entirely by the ← / → buttons below. Upgrade path: when the package
+          ships Pressable (or an onPress on View), wrap each tile in it. */}
       <Tiles maxPerLine={5} spacing="tight">
         {offers.map((offer, i) => (
-          <Pressable key={offer.variantId} onPress={() => onSelect(i)}>
-            <View
-              padding="tight"
-              border="base"
-              cornerRadius="none"
-              background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
-            >
-              <BlockStack spacing="tight" inlineAlignment="center">
-                {offer.imageUrl ? (
-                  <Image
-                    source={offer.imageUrl}
-                    description={offer.productTitle}
-                    aspectRatio={0.75}
-                    fit="cover"
-                  />
-                ) : (
-                  <View
-                    padding="loose"
-                    background={COLORS.secondary}
-                    cornerRadius="none"
-                  >
-                    <Text size="small" emphasized>
-                      {String(i + 1).padStart(2, "0")}
-                    </Text>
-                  </View>
-                )}
-                <Text size="small" emphasized>
-                  {offer.productTitle}
-                </Text>
-              </BlockStack>
-            </View>
-          </Pressable>
+          <View
+            key={offer.variantId}
+            padding="tight"
+            border="base"
+            cornerRadius="none"
+            background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
+          >
+            <BlockStack spacing="tight" inlineAlignment="center">
+              {offer.imageUrl ? (
+                <Image
+                  source={offer.imageUrl}
+                  description={offer.productTitle}
+                  aspectRatio={0.75}
+                  fit="cover"
+                />
+              ) : (
+                <View
+                  padding="loose"
+                  background={COLORS.secondary}
+                  cornerRadius="none"
+                >
+                  <Text size="small" emphasized>
+                    {String(i + 1).padStart(2, "0")}
+                  </Text>
+                </View>
+              )}
+              <Text size="small" emphasized>
+                {offer.productTitle}
+              </Text>
+            </BlockStack>
+          </View>
         ))}
       </Tiles>
       <InlineStack spacing="base" blockAlignment="center">
@@ -394,11 +396,9 @@ function TerminalPanel({ state, offer, onDone, onReset }) {
           </Button>
           {/* ponytail: dev-only reset — remove before shipping to prod. */}
           {state !== "accepted" && (
-            <Pressable onPress={onReset}>
-              <Text appearance="subdued" size="small">
-                Back to the offer
-              </Text>
-            </Pressable>
+            <Button plain onPress={onReset}>
+              Back to the offer
+            </Button>
           )}
         </BlockStack>
       </View>
