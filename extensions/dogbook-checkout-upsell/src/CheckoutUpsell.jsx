@@ -43,20 +43,45 @@ function CheckoutUpsell() {
   const [added, setAdded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [debugMsg, setDebugMsg] = useState("mounted");
 
   const cartVariantGids = cartLines.map((l) => l.merchandise?.id).filter(Boolean);
+
+  console.log("[upsell] mount", {
+    myshopifyDomain,
+    cartLineCount: cartLines.length,
+    cartVariantGids,
+    appUrl,
+  });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await fetchOffers(appUrl, {
-        shopDomain: myshopifyDomain,
-      });
-      if (cancelled) return;
-      const filtered = filterNotInCart(result.offers, cartVariantGids);
-      setOffers(filtered);
-      setDiscountPercent(result.discountPercent);
-      setLoading(false);
+      console.log("[upsell] fetching", { appUrl, myshopifyDomain });
+      setDebugMsg("fetching");
+      try {
+        const result = await fetchOffers(appUrl, {
+          shopDomain: myshopifyDomain,
+        });
+        console.log("[upsell] fetched", result);
+        if (cancelled) return;
+        const filtered = filterNotInCart(result.offers, cartVariantGids);
+        console.log("[upsell] filtered", {
+          before: result.offers.length,
+          after: filtered.length,
+          cartVariantGids,
+        });
+        setOffers(filtered);
+        setDiscountPercent(result.discountPercent);
+        setDebugMsg(
+          `fetched ${result.offers?.length ?? 0}, after filter ${filtered.length}`,
+        );
+      } catch (err) {
+        console.error("[upsell] fetch threw", err);
+        setDebugMsg(`fetch threw: ${err?.message ?? err}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -66,7 +91,21 @@ function CheckoutUpsell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myshopifyDomain, cartLines.length]);
 
-  if (loading || !offers.length) return null;
+  // ponytail: visible banner while debugging. Shows mount + fetch state inline
+  // so we can see what step the extension is in without needing a working
+  // DevTools console. Remove once the panel renders.
+  if (loading || !offers.length) {
+    return (
+      <View border="base" cornerRadius="none" padding="base" background="#F2F7F3">
+        <BlockStack spacing="tight">
+          <Text emphasized>[upsell debug] {debugMsg}</Text>
+          <Text size="small" appearance="subdued">
+            cart variants: {cartVariantGids.join(", ") || "(none)"}
+          </Text>
+        </BlockStack>
+      </View>
+    );
+  }
 
   const selected = offers[selectedIdx];
   const compareAt = selected.compareAtPrice ?? selected.price;

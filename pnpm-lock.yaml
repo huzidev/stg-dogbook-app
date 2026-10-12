@@ -114,11 +114,11 @@ importers:
   extensions/dogbook-checkout-upsell:
     dependencies:
       '@shopify/ui-extensions':
-        specifier: ^2024.10.0
-        version: 2024.10.2
+        specifier: 2025.7.x
+        version: 2025.7.4
       '@shopify/ui-extensions-react':
-        specifier: ^2024.10.0
-        version: 2024.10.2(@shopify/ui-extensions@2024.10.2)(react-reconciler@0.26.2(react@18.3.1))(react@18.3.1)
+        specifier: 2025.7.x
+        version: 2025.7.3(@shopify/ui-extensions@2025.7.4)(react-reconciler@0.26.2(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1424,14 +1424,14 @@ packages:
   '@shopify/storefront-api-client@1.0.10':
     resolution: {integrity: sha512-A0ItFW58L5+y/jnnJDEsmt2YcQSt2BG+pNoQOYRpPBJaOLpTj7A13q1QVrE5XYVGZCA6ZQ6FqAtgosHHrkut0Q==}
 
-  '@shopify/ui-extensions-react@2024.10.2':
-    resolution: {integrity: sha512-TF97qiPWtWIGtS9Rwl8CIhZ3uYD09oFHALQtksmHXsFoW6cK5/QPPXr9y9neac7nKJIqjzVYQxmRAba1T8y3nA==}
+  '@shopify/ui-extensions-react@2025.7.3':
+    resolution: {integrity: sha512-XNi91jm5oMhJG4ktoUeIQyvajDMse+MkOwc6x39NHDrjDbOEEoqBKqY+AB7ef+T9I0FDw9vkN9PdzDnXQJqEow==}
     peerDependencies:
-      '@shopify/ui-extensions': 2024.10.2
+      '@shopify/ui-extensions': 2025.7.3
       react: '>=18.0.0'
 
-  '@shopify/ui-extensions@2024.10.2':
-    resolution: {integrity: sha512-aHlKqbJMqL5yI0YjVucNhWNXciMKiibPpnawMmiqqzfmflnmj2Oy0AMa6Hrwdum/rc4XE9EoLqKyoIva4wzmdA==}
+  '@shopify/ui-extensions@2025.7.4':
+    resolution: {integrity: sha512-pKk0UadAa/sW3McqbjnzxGmxZZIsNPJF/rX0zpMCzJqG2E0Fh/SIksDquD9MOXHskgLM7c7t+YHveml2aITLtQ==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -5466,17 +5466,17 @@ snapshots:
     dependencies:
       '@shopify/graphql-client': 1.4.2
 
-  '@shopify/ui-extensions-react@2024.10.2(@shopify/ui-extensions@2024.10.2)(react-reconciler@0.26.2(react@18.3.1))(react@18.3.1)':
+  '@shopify/ui-extensions-react@2025.7.3(@shopify/ui-extensions@2025.7.4)(react-reconciler@0.26.2(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@remote-ui/async-subscription': 2.1.18
       '@remote-ui/react': 5.0.8(react-reconciler@0.26.2(react@18.3.1))(react@18.3.1)
-      '@shopify/ui-extensions': 2024.10.2
+      '@shopify/ui-extensions': 2025.7.4
       '@types/react': 18.3.31
       react: 18.3.1
     transitivePeerDependencies:
       - react-reconciler
 
-  '@shopify/ui-extensions@2024.10.2':
+  '@shopify/ui-extensions@2025.7.4':
     dependencies:
       '@remote-ui/async-subscription': 2.1.18
       '@remote-ui/core': 2.2.7
