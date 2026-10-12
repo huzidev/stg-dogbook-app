@@ -1,23 +1,18 @@
-/* eslint-disable react/prop-types */
-import { useEffect, useState } from "react";
-import {
-  reactExtension,
-  BlockStack,
-  Button,
-  Divider,
-  Heading,
-  Icon,
-  Image,
-  InlineStack,
-  Pressable,
-  Text,
-  View,
-  useApplyCartLinesChange,
-  useCartLines,
-  useShop,
-} from "@shopify/ui-extensions-react/checkout";
+/** @jsxImportSource preact */
+/* eslint-disable no-undef, react/no-unknown-property */
+// Checkout UI extension, 2025-10 API.
+// Pattern copied from docs/checkout-extension/PLAN.md (the earlier working
+// extension in this repo).
 
-import { COLORS, UPSELL_SOURCE_KEY, UPSELL_SOURCE_CHECKOUT } from "../../_shared/tokens.js";
+import "@shopify/ui-extensions/preact";
+import { render } from "preact";
+import { useEffect, useState } from "preact/hooks";
+
+import {
+  COLORS,
+  UPSELL_SOURCE_KEY,
+  UPSELL_SOURCE_CHECKOUT,
+} from "../../_shared/tokens.js";
 import {
   APP_URL,
   fetchOffers,
@@ -25,16 +20,24 @@ import {
   formatMoney,
 } from "../../_shared/useOffers.js";
 
-export default reactExtension(
-  "purchase.checkout.cart-line-list.render-after",
-  () => <CheckoutUpsell />,
-);
+export default function () {
+  render(<Extension />, document.body);
+}
 
-function CheckoutUpsell() {
-  const { myshopifyDomain } = useShop();
-  const cartLines = useCartLines();
-  const applyCartLinesChange = useApplyCartLinesChange();
-  const appUrl = APP_URL;
+function Extension() {
+  const [lines, setLines] = useState(() => shopify.lines.value ?? []);
+  const [shopInfo, setShopInfo] = useState(() => shopify.shop?.value ?? shopify.shop ?? {});
+
+  useEffect(
+    () => shopify.lines?.subscribe?.((n) => setLines(n ?? [])),
+    [],
+  );
+  useEffect(
+    () => shopify.shop?.subscribe?.((n) => setShopInfo(n ?? {})),
+    [],
+  );
+
+  const myshopifyDomain = shopInfo?.myshopifyDomain;
 
   const [loading, setLoading] = useState(true);
   const [offers, setOffers] = useState([]);
@@ -45,24 +48,21 @@ function CheckoutUpsell() {
   const [error, setError] = useState(null);
   const [debugMsg, setDebugMsg] = useState("mounted");
 
-  const cartVariantGids = cartLines.map((l) => l.merchandise?.id).filter(Boolean);
+  const cartVariantGids = lines.map((l) => l.merchandise?.id).filter(Boolean);
 
   console.log("[upsell] mount", {
     myshopifyDomain,
-    cartLineCount: cartLines.length,
+    cartLineCount: lines.length,
     cartVariantGids,
-    appUrl,
   });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      console.log("[upsell] fetching", { appUrl, myshopifyDomain });
+      console.log("[upsell] fetching", { APP_URL, myshopifyDomain });
       setDebugMsg("fetching");
       try {
-        const result = await fetchOffers(appUrl, {
-          shopDomain: myshopifyDomain,
-        });
+        const result = await fetchOffers(APP_URL, { shopDomain: myshopifyDomain });
         console.log("[upsell] fetched", result);
         if (cancelled) return;
         const filtered = filterNotInCart(result.offers, cartVariantGids);
@@ -86,36 +86,37 @@ function CheckoutUpsell() {
     return () => {
       cancelled = true;
     };
-    // ponytail: refetch on cart change — if the shopper manually adds the
-    // upsell variant via Shopify's own UI, we want to disappear.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myshopifyDomain, cartLines.length]);
+  }, [myshopifyDomain, lines.length]);
 
-  // ponytail: visible banner while debugging. Shows mount + fetch state inline
-  // so we can see what step the extension is in without needing a working
-  // DevTools console. Remove once the panel renders.
   if (loading || !offers.length) {
     return (
-      <View border="base" cornerRadius="none" padding="base" background="#F2F7F3">
-        <BlockStack spacing="tight">
-          <Text emphasized>[upsell debug] {debugMsg}</Text>
-          <Text size="small" appearance="subdued">
-            cart variants: {cartVariantGids.join(", ") || "(none)"}
-          </Text>
-        </BlockStack>
-      </View>
+      <s-stack
+        direction="block"
+        gap="small-100"
+        padding="base"
+        border="base"
+        background={COLORS.accentTint}
+      >
+        <s-text type="strong">[upsell debug] {debugMsg}</s-text>
+        <s-text type="small" tone="neutral">
+          cart variants: {cartVariantGids.join(", ") || "(none)"}
+        </s-text>
+      </s-stack>
     );
   }
 
   const selected = offers[selectedIdx];
   const compareAt = selected.compareAtPrice ?? selected.price;
-  const discounted = computeDiscounted(selected.price ?? compareAt, discountPercent);
+  const discounted = computeDiscounted(
+    selected.price ?? compareAt,
+    discountPercent,
+  );
 
   const add = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await applyCartLinesChange({
+      const result = await shopify.applyCartLinesChange({
         type: "addCartLine",
         merchandiseId: selected.variantGid,
         quantity: 1,
@@ -128,170 +129,134 @@ function CheckoutUpsell() {
       }
       setAdded(true);
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[checkout-upsell] add failed", err);
+      console.error("[upsell] add failed", err);
       setError("Could not add this book.");
       setSubmitting(false);
     }
   };
 
-  if (added) {
-    return <AddedPanel breed={selected.productTitle} />;
-  }
+  if (added) return <AddedPanel breed={selected.productTitle} />;
 
   const canPrev = selectedIdx > 0;
   const canNext = selectedIdx < offers.length - 1;
 
   return (
-    <View
-      border="base"
-      cornerRadius="none"
+    <s-stack
+      direction="block"
+      gap="base"
       padding="base"
+      border="base"
       background={COLORS.accentTint}
     >
-      <BlockStack spacing="tight">
-        <Heading level={3}>
-          Add a book, save {discountPercent}% off your next order
-        </Heading>
+      <s-heading size="large-100">
+        Add a book, save {discountPercent}% off your next order
+      </s-heading>
 
-        <InlineStack spacing="tight">
-          {/* −20% pill */}
-          <View padding="extraTight" background={COLORS.accent} cornerRadius="none">
-            <Text size="small" emphasized appearance="monochrome">
-              −{discountPercent}%
-            </Text>
-          </View>
-          {/* $0 EXTRA SHIPPING pill */}
-          <View padding="extraTight" border="base" cornerRadius="none">
-            <Text size="small" emphasized appearance="success">
-              $0 EXTRA SHIPPING
-            </Text>
-          </View>
-        </InlineStack>
+      <s-stack direction="inline" gap="small-100">
+        <s-text type="strong">−{discountPercent}%</s-text>
+        <s-text type="strong" tone="positive">$0 EXTRA SHIPPING</s-text>
+      </s-stack>
 
-        {/* ponytail: no horizontal-scroll primitive. Approximate the strip as a
-            wrapping InlineStack. Native touch/trackpad scroll is lost; arrows
-            still change selection. Upgrade path: Shopify's ScrollView when it
-            lands on this target. */}
-        <InlineStack spacing="tight">
-          {offers.map((o, i) => (
-            <Pressable
-              key={o.variantId}
-              onPress={() => setSelectedIdx(i)}
-              accessibilityLabel={o.productTitle}
+      <s-stack direction="inline" gap="small-100">
+        {offers.map((o, i) => (
+          <s-clickable
+            key={o.variantId}
+            onclick={() => setSelectedIdx(i)}
+            accessibility-label={o.productTitle}
+          >
+            <s-stack
+              direction="block"
+              gap="small-100"
+              padding="small-100"
+              border="base"
+              background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
             >
-              <View
-                padding="tight"
-                border="base"
-                cornerRadius="none"
-                background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
-              >
-                <BlockStack spacing="tight" inlineAlignment="center">
-                  {o.imageUrl ? (
-                    <Image source={o.imageUrl} description={o.productTitle} />
-                  ) : (
-                    <View padding="base" background={COLORS.secondary}>
-                      <Text size="small" emphasized>
-                        {String(i + 1).padStart(2, "0")}
-                      </Text>
-                    </View>
-                  )}
-                  <Text size="small" emphasized>
-                    {o.productTitle}
-                  </Text>
-                </BlockStack>
-              </View>
-            </Pressable>
-          ))}
-        </InlineStack>
-
-        <InlineStack spacing="base" blockAlignment="center">
-          <Text appearance="subdued" size="small">
-            Swipe →
-          </Text>
-          <Text appearance="subdued" size="small" emphasized>
-            {selectedIdx + 1} / {offers.length}
-          </Text>
-          <Button
-            kind="plain"
-            onPress={() => canPrev && setSelectedIdx(selectedIdx - 1)}
-            disabled={!canPrev}
-            accessibilityLabel="Previous breed"
-          >
-            ←
-          </Button>
-          <Button
-            kind="plain"
-            onPress={() => canNext && setSelectedIdx(selectedIdx + 1)}
-            disabled={!canNext}
-            accessibilityLabel="Next breed"
-          >
-            →
-          </Button>
-        </InlineStack>
-
-        <Divider />
-
-        <InlineStack spacing="base" blockAlignment="center">
-          {selected.imageUrl && (
-            <Image source={selected.imageUrl} description={selected.productTitle} />
-          )}
-          <BlockStack spacing="none">
-            <Text emphasized>{selected.productTitle}</Text>
-            <InlineStack spacing="tight">
-              {compareAt && Number(compareAt) !== Number(discounted) && (
-                <Text appearance="subdued" size="small">
-                  {formatMoney(compareAt)}
-                </Text>
+              {o.imageUrl ? (
+                <s-image source={o.imageUrl} alt={o.productTitle} />
+              ) : (
+                <s-text type="small" tone="neutral">
+                  {String(i + 1).padStart(2, "0")}
+                </s-text>
               )}
-              <Text size="base" emphasized>
-                {formatMoney(discounted)}
-              </Text>
-            </InlineStack>
-          </BlockStack>
-          <Button
-            kind="primary"
-            onPress={add}
-            loading={submitting}
-            accessibilityLabel={`Add ${selected.productTitle}`}
-          >
-            ADD
-          </Button>
-        </InlineStack>
+              <s-text type="small">{o.productTitle}</s-text>
+            </s-stack>
+          </s-clickable>
+        ))}
+      </s-stack>
 
-        {error && (
-          <Text appearance="critical" size="small">
-            {error}
-          </Text>
+      <s-stack direction="inline" gap="base">
+        <s-text type="small" tone="neutral">Swipe →</s-text>
+        <s-text type="small" tone="neutral">
+          {selectedIdx + 1} / {offers.length}
+        </s-text>
+        <s-button
+          variant="plain"
+          onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
+          disabled={!canPrev || undefined}
+          accessibility-label="Previous breed"
+        >←</s-button>
+        <s-button
+          variant="plain"
+          onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
+          disabled={!canNext || undefined}
+          accessibility-label="Next breed"
+        >→</s-button>
+      </s-stack>
+
+      <s-divider />
+
+      <s-grid gridTemplateColumns="auto 1fr auto" gap="base" alignItems="center">
+        {selected.imageUrl ? (
+          <s-product-thumbnail
+            src={selected.imageUrl}
+            alt={selected.productTitle}
+            size="base"
+          />
+        ) : (
+          <s-box />
         )}
+        <s-stack gap="small-200">
+          <s-text type="strong">{selected.productTitle}</s-text>
+          <s-stack direction="inline" gap="small-100">
+            {compareAt && Number(compareAt) !== Number(discounted) && (
+              <s-text type="small" tone="neutral">{formatMoney(compareAt)}</s-text>
+            )}
+            <s-text type="strong">{formatMoney(discounted)}</s-text>
+          </s-stack>
+        </s-stack>
+        <s-button
+          variant="primary"
+          onclick={add}
+          loading={submitting || undefined}
+          accessibility-label={`Add ${selected.productTitle}`}
+        >ADD</s-button>
+      </s-grid>
 
-        <View inlineAlignment="center">
-          <Text size="small" appearance="subdued">
-            🔒 One click · ships together · no card details
-          </Text>
-        </View>
-      </BlockStack>
-    </View>
+      {error && (
+        <s-text type="small" tone="critical">{error}</s-text>
+      )}
+
+      <s-text type="small" tone="neutral">
+        🔒 One click · ships together · no card details
+      </s-text>
+    </s-stack>
   );
 }
 
 function AddedPanel({ breed }) {
   return (
-    <View
+    <s-stack
+      direction="block"
+      gap="base"
+      padding="base"
       border="base"
-      cornerRadius="none"
-      padding="loose"
       background={COLORS.accentTint}
-      minBlockSize={280}
     >
-      <BlockStack spacing="base" inlineAlignment="center">
-        <Icon source="checkmark" size="large" />
-        <Heading level={3}>Added to your order</Heading>
-        <Text appearance="subdued" size="small">
-          Your {breed} ships with your order — $0 extra shipping.
-        </Text>
-      </BlockStack>
-    </View>
+      <s-heading size="large-100">Added to your order</s-heading>
+      <s-text type="small" tone="neutral">
+        Your {breed} ships with your order — $0 extra shipping.
+      </s-text>
+    </s-stack>
   );
 }
 
