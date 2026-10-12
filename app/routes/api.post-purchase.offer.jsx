@@ -2,7 +2,9 @@ import { data } from "react-router";
 import { unauthenticated } from "../shopify.server";
 
 const tag = "[post-purchase/offer]";
-const METAOBJECT_TYPE = "app--post_purchase_offer";
+// ponytail: $app: shorthand resolves to app--<app_id>--post_purchase_offer at
+// query time, so we don't have to hardcode the app id.
+const METAOBJECT_TYPE = "$app:post_purchase_offer";
 
 // ponytail: public GET endpoint — the extension calls this from Shopify's
 // checkout iframe before the user clicks anything, so there's no inputData.token

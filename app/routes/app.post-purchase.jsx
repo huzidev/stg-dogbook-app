@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
 import { authenticate } from "../shopify.server";
 
-const METAOBJECT_TYPE = "app--post_purchase_offer";
+const METAOBJECT_TYPE = "$app:post_purchase_offer";
 const DEFAULT_HANDLE = "default-offer";
 const DEFAULT_DISCOUNT = 20;
 
