@@ -1,8 +1,9 @@
 /** @jsxImportSource preact */
 /* eslint-disable no-undef, react/no-unknown-property */
 // Checkout UI extension, 2025-10 API.
-// Pattern copied from docs/checkout-extension/PLAN.md (the earlier working
-// extension in this repo).
+// Layout mirrors docs/post-purchase/03-checkout-cross-sell.md as closely as
+// Shopify's Polaris checkout web components allow (fixed component library,
+// no arbitrary CSS).
 
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
@@ -20,6 +21,8 @@ import {
   formatMoney,
 } from "../../_shared/useOffers.js";
 
+const TILE_WIDTH = "118px";
+
 export default function () {
   render(<Extension />, document.body);
 }
@@ -28,14 +31,8 @@ function Extension() {
   const [lines, setLines] = useState(() => shopify.lines.value ?? []);
   const [shopInfo, setShopInfo] = useState(() => shopify.shop?.value ?? shopify.shop ?? {});
 
-  useEffect(
-    () => shopify.lines?.subscribe?.((n) => setLines(n ?? [])),
-    [],
-  );
-  useEffect(
-    () => shopify.shop?.subscribe?.((n) => setShopInfo(n ?? {})),
-    [],
-  );
+  useEffect(() => shopify.lines?.subscribe?.((n) => setLines(n ?? [])), []);
+  useEffect(() => shopify.shop?.subscribe?.((n) => setShopInfo(n ?? {})), []);
 
   const myshopifyDomain = shopInfo?.myshopifyDomain;
 
@@ -46,39 +43,18 @@ function Extension() {
   const [added, setAdded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [debugMsg, setDebugMsg] = useState("mounted");
 
   const cartVariantGids = lines.map((l) => l.merchandise?.id).filter(Boolean);
-
-  console.log("[upsell] mount", {
-    myshopifyDomain,
-    cartLineCount: lines.length,
-    cartVariantGids,
-  });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      console.log("[upsell] fetching", { APP_URL, myshopifyDomain });
-      setDebugMsg("fetching");
       try {
         const result = await fetchOffers(APP_URL, { shopDomain: myshopifyDomain });
-        console.log("[upsell] fetched", result);
         if (cancelled) return;
         const filtered = filterNotInCart(result.offers, cartVariantGids);
-        console.log("[upsell] filtered", {
-          before: result.offers.length,
-          after: filtered.length,
-          cartVariantGids,
-        });
         setOffers(filtered);
         setDiscountPercent(result.discountPercent);
-        setDebugMsg(
-          `fetched ${result.offers?.length ?? 0}, after filter ${filtered.length}`,
-        );
-      } catch (err) {
-        console.error("[upsell] fetch threw", err);
-        setDebugMsg(`fetch threw: ${err?.message ?? err}`);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -88,29 +64,12 @@ function Extension() {
     };
   }, [myshopifyDomain, lines.length]);
 
-  if (loading || !offers.length) {
-    return (
-      <s-stack
-        direction="block"
-        gap="small-100"
-        padding="base"
-        border="base"
-        background={COLORS.accentTint}
-      >
-        <s-text type="strong">[upsell debug] {debugMsg}</s-text>
-        <s-text type="small" tone="neutral">
-          cart variants: {cartVariantGids.join(", ") || "(none)"}
-        </s-text>
-      </s-stack>
-    );
-  }
+  // ponytail: silent fallback instead of a debug stack; nothing to show = nothing rendered
+  if (loading || !offers.length) return null;
 
   const selected = offers[selectedIdx];
   const compareAt = selected.compareAtPrice ?? selected.price;
-  const discounted = computeDiscounted(
-    selected.price ?? compareAt,
-    discountPercent,
-  );
+  const discounted = computeDiscounted(selected.price ?? compareAt, discountPercent);
 
   const add = async () => {
     setSubmitting(true);
@@ -128,8 +87,7 @@ function Extension() {
         return;
       }
       setAdded(true);
-    } catch (err) {
-      console.error("[upsell] add failed", err);
+    } catch {
       setError("Could not add this book.");
       setSubmitting(false);
     }
@@ -153,55 +111,69 @@ function Extension() {
       </s-heading>
 
       <s-stack direction="inline" gap="small-100">
-        <s-text type="strong">−{discountPercent}%</s-text>
-        <s-text type="strong" tone="positive">$0 EXTRA SHIPPING</s-text>
+        <s-badge size="small">−{discountPercent}%</s-badge>
+        <s-badge size="small" tone="neutral">$0 EXTRA SHIPPING</s-badge>
       </s-stack>
 
-      <s-stack direction="inline" gap="small-100">
-        {offers.map((o, i) => (
-          <s-clickable
-            key={o.variantId}
-            onclick={() => setSelectedIdx(i)}
-            accessibility-label={o.productTitle}
-          >
-            <s-stack
-              direction="block"
-              gap="small-100"
-              padding="small-100"
-              border="base"
-              background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
+      <s-scroll-box overflow="auto hidden">
+        <s-stack direction="inline" gap="small-100">
+          {offers.map((o, i) => (
+            <s-clickable
+              key={o.variantId}
+              onclick={() => setSelectedIdx(i)}
+              accessibility-label={o.productTitle}
             >
-              {o.imageUrl ? (
-                <s-image source={o.imageUrl} alt={o.productTitle} />
-              ) : (
-                <s-text type="small" tone="neutral">
-                  {String(i + 1).padStart(2, "0")}
-                </s-text>
-              )}
-              <s-text type="small">{o.productTitle}</s-text>
-            </s-stack>
-          </s-clickable>
-        ))}
-      </s-stack>
+              <s-box
+                minInlineSize={TILE_WIDTH}
+                maxInlineSize={TILE_WIDTH}
+                padding="small-100"
+                border="base"
+                background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
+              >
+                <s-stack direction="block" gap="small-100" alignInline="center">
+                  {o.imageUrl ? (
+                    <s-image source={o.imageUrl} alt={o.productTitle} />
+                  ) : (
+                    <s-box
+                      padding="small-100"
+                      background={COLORS.secondary}
+                      minBlockSize="80px"
+                    >
+                      <s-text type="small" tone="neutral">
+                        {String(i + 1).padStart(2, "0")}
+                      </s-text>
+                    </s-box>
+                  )}
+                  <s-text type="small">{o.productTitle}</s-text>
+                </s-stack>
+              </s-box>
+            </s-clickable>
+          ))}
+        </s-stack>
+      </s-scroll-box>
 
-      <s-stack direction="inline" gap="base">
+      <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
         <s-text type="small" tone="neutral">Swipe →</s-text>
-        <s-text type="small" tone="neutral">
-          {selectedIdx + 1} / {offers.length}
-        </s-text>
-        <s-button
-          variant="plain"
-          onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
-          disabled={!canPrev || undefined}
-          accessibility-label="Previous breed"
-        >←</s-button>
-        <s-button
-          variant="plain"
-          onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
-          disabled={!canNext || undefined}
-          accessibility-label="Next breed"
-        >→</s-button>
-      </s-stack>
+        <s-stack direction="inline" gap="small-100" alignItems="center">
+          <s-text type="small" tone="neutral">
+            {selectedIdx + 1} / {offers.length}
+          </s-text>
+          <s-button
+            variant="secondary"
+            onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
+            disabled={!canPrev || undefined}
+            accessibility-label="Previous breed"
+            icon="arrow-left"
+          />
+          <s-button
+            variant="secondary"
+            onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
+            disabled={!canNext || undefined}
+            accessibility-label="Next breed"
+            icon="arrow-right"
+          />
+        </s-stack>
+      </s-grid>
 
       <s-divider />
 
@@ -215,7 +187,7 @@ function Extension() {
         ) : (
           <s-box />
         )}
-        <s-stack gap="small-200">
+        <s-stack direction="block" gap="small-200">
           <s-text type="strong">{selected.productTitle}</s-text>
           <s-stack direction="inline" gap="small-100">
             {compareAt && Number(compareAt) !== Number(discounted) && (
@@ -232,13 +204,14 @@ function Extension() {
         >ADD</s-button>
       </s-grid>
 
-      {error && (
-        <s-text type="small" tone="critical">{error}</s-text>
-      )}
+      {error && <s-text type="small" tone="critical">{error}</s-text>}
 
-      <s-text type="small" tone="neutral">
-        🔒 One click · ships together · no card details
-      </s-text>
+      <s-stack direction="inline" gap="small-100" alignInline="center" alignItems="center">
+        <s-icon type="lock" size="small" />
+        <s-text type="small" tone="neutral">
+          One click · ships together · no card details
+        </s-text>
+      </s-stack>
     </s-stack>
   );
 }
@@ -251,7 +224,9 @@ function AddedPanel({ breed }) {
       padding="base"
       border="base"
       background={COLORS.accentTint}
+      alignInline="center"
     >
+      <s-icon type="check-circle" size="large" />
       <s-heading size="large-100">Added to your order</s-heading>
       <s-text type="small" tone="neutral">
         Your {breed} ships with your order — $0 extra shipping.
