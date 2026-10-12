@@ -14,7 +14,6 @@ import {
   View,
   useApplyCartLinesChange,
   useCartLines,
-  useSettings,
   useShop,
 } from "@shopify/ui-extensions-react/checkout";
 
@@ -35,8 +34,7 @@ function CheckoutUpsell() {
   const { myshopifyDomain } = useShop();
   const cartLines = useCartLines();
   const applyCartLinesChange = useApplyCartLinesChange();
-  const settings = useSettings();
-  const appUrl = settings?.app_url || APP_URL;
+  const appUrl = APP_URL;
 
   const [loading, setLoading] = useState(true);
   const [offers, setOffers] = useState([]);
