@@ -1,0 +1,15 @@
+{
+  "name": "dogbook-checkout-upsell",
+  "private": true,
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "main": "src/CheckoutUpsell.jsx",
+  "dependencies": {
+    "react": "^18.3.1",
+    "@shopify/ui-extensions": "^2024.10.0",
+    "@shopify/ui-extensions-react": "^2024.10.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0"
+  }
+}

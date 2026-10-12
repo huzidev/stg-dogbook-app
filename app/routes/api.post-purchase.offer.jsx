@@ -7,7 +7,7 @@ const METAOBJECT_TYPE = "app--post_purchase_offer";
 // ponytail: public GET endpoint — the extension calls this from Shopify's
 // checkout iframe before the user clicks anything, so there's no inputData.token
 // to verify yet. The response contains only merchant-configured display data
-// (variant id + discount + copy), not secrets. If we ever return anything
+// (variant list + discount + copy), not secrets. If we ever return anything
 // sensitive here, require a signed token.
 const corsHeaders = (request) => ({
   "Access-Control-Allow-Origin": request.headers.get("origin") ?? "*",
@@ -23,7 +23,7 @@ const preflight = (request) =>
     headers: { ...corsHeaders(request), "Access-Control-Max-Age": "86400" },
   });
 
-const parseProductIds = (raw) =>
+const parseIds = (raw) =>
   (raw ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -31,22 +31,18 @@ const parseProductIds = (raw) =>
 
 const gidToNumeric = (gid) => (gid ? String(gid).split("/").pop() : null);
 
-const normalizeOffer = (offer) => {
+const DEFAULT_DISCOUNT = 20;
+
+const normalizeLegacyOffer = (offer) => {
   if (!offer || typeof offer !== "object") return null;
   const variantId = Number(offer.variantId);
   if (!Number.isFinite(variantId) || variantId <= 0) return null;
   return {
-    variantId,
-    quantity: Math.max(1, Number(offer.quantity) || 1),
-    productTitle: String(offer.productTitle ?? ""),
-    description: String(offer.description ?? ""),
-    imageUrl: offer.imageUrl ? String(offer.imageUrl) : null,
-    discount: {
-      value: Number(offer.discount?.value ?? 0),
-      valueType:
-        offer.discount?.valueType === "fixed_amount" ? "fixed_amount" : "percentage",
-      title: String(offer.discount?.title ?? "Post-purchase discount"),
-    },
+    variantIds: [variantId],
+    discountPercent:
+      offer.discount?.valueType === "percentage"
+        ? Number(offer.discount?.value) || DEFAULT_DISCOUNT
+        : DEFAULT_DISCOUNT,
   };
 };
 
@@ -60,6 +56,11 @@ const resolveFromMetaobjects = async (admin, purchasedProductIds) => {
           fields {
             key
             value
+            references(first: 50) {
+              nodes {
+                ... on ProductVariant { id }
+              }
+            }
             reference { ... on Product { id } }
           }
         }
@@ -74,22 +75,38 @@ const resolveFromMetaobjects = async (admin, purchasedProductIds) => {
     .map((node) => {
       const map = {};
       for (const f of node.fields ?? []) {
-        map[f.key] = { value: f.value, reference: f.reference };
+        map[f.key] = f;
       }
       const enabled = map.enabled?.value === "true";
       if (!enabled) return null;
-      let offer;
-      try {
-        offer = JSON.parse(map.offer?.value ?? "null");
-      } catch {
-        return null;
+
+      // Prefer new typed fields; fall back to legacy JSON blob.
+      const variantRefs = map.variant_ids?.references?.nodes ?? [];
+      let variantIds = variantRefs
+        .map((n) => Number(gidToNumeric(n?.id)))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      let discountPercent = Number(map.discount_percent?.value);
+      if (!Number.isFinite(discountPercent) || discountPercent <= 0) {
+        discountPercent = DEFAULT_DISCOUNT;
       }
-      const normalized = normalizeOffer(offer);
-      if (!normalized) return null;
+
+      if (!variantIds.length) {
+        let legacy = null;
+        try {
+          legacy = JSON.parse(map.offer?.value ?? "null");
+        } catch {
+          // ponytail: malformed legacy JSON — skip entry
+        }
+        const normalized = normalizeLegacyOffer(legacy);
+        if (!normalized) return null;
+        variantIds = normalized.variantIds;
+        discountPercent = normalized.discountPercent;
+      }
+
       const triggerProductGid = map.trigger_product?.reference?.id ?? null;
       const triggerProductId = gidToNumeric(triggerProductGid);
       const priority = Number(map.priority?.value ?? 0) || 0;
-      return { offer: normalized, triggerProductId, priority };
+      return { variantIds, discountPercent, triggerProductId, priority };
     })
     .filter(Boolean);
 
@@ -102,7 +119,7 @@ const resolveFromMetaobjects = async (admin, purchasedProductIds) => {
   if (!matching.length) return null;
 
   matching.sort((a, b) => b.priority - a.priority);
-  return matching[0].offer;
+  return matching[0];
 };
 
 const resolveFromMetafield = async (admin) => {
@@ -118,10 +135,55 @@ const resolveFromMetafield = async (admin) => {
   const raw = body?.data?.shop?.metafield?.value;
   if (!raw) return null;
   try {
-    return normalizeOffer(JSON.parse(raw));
+    return normalizeLegacyOffer(JSON.parse(raw));
   } catch {
     return null;
   }
+};
+
+const hydrateVariants = async (admin, variantIds) => {
+  if (!variantIds.length) return [];
+  const gids = variantIds.map(
+    (id) => `gid://shopify/ProductVariant/${id}`,
+  );
+  const resp = await admin.graphql(
+    `#graphql
+    query HydrateVariants($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on ProductVariant {
+          id
+          title
+          price
+          compareAtPrice
+          image { url altText }
+          product {
+            title
+            featuredImage { url altText }
+          }
+        }
+      }
+    }`,
+    { variables: { ids: gids } },
+  );
+  const body = await resp.json();
+  const nodes = body?.data?.nodes ?? [];
+  return nodes
+    .map((n) => {
+      if (!n?.id) return null;
+      const variantGid = n.id;
+      const variantId = Number(gidToNumeric(variantGid));
+      const image = n.image?.url ?? n.product?.featuredImage?.url ?? null;
+      const productTitle = n.product?.title ?? "";
+      return {
+        variantId,
+        variantGid,
+        productTitle,
+        imageUrl: image,
+        price: n.price,
+        compareAtPrice: n.compareAtPrice,
+      };
+    })
+    .filter(Boolean);
 };
 
 export const loader = async ({ request }) => {
@@ -136,31 +198,45 @@ export const loader = async ({ request }) => {
     );
   }
 
-  const productIds = parseProductIds(url.searchParams.get("product_ids"));
+  const productIds = parseIds(url.searchParams.get("product_ids"));
 
   try {
     const { admin } = await unauthenticated.admin(shop);
 
-    // Prefer a matching metaobject entry (B); fall back to shop metafield (A).
-    let offer = await resolveFromMetaobjects(admin, productIds);
+    let config = await resolveFromMetaobjects(admin, productIds);
     let source = "metaobject";
-    if (!offer) {
-      offer = await resolveFromMetafield(admin);
+    if (!config) {
+      config = await resolveFromMetafield(admin);
       source = "metafield";
     }
 
-    if (!offer) {
+    if (!config) {
       console.log(`${tag} no offer configured for shop=${shop}`);
-      return data({ offer: null }, { status: 200, headers: corsHeaders(request) });
+      return data(
+        { offers: [], discountPercent: DEFAULT_DISCOUNT },
+        { status: 200, headers: corsHeaders(request) },
+      );
     }
 
+    const offers = await hydrateVariants(admin, config.variantIds);
+
     console.log(
-      `${tag} resolved shop=${shop} source=${source} variantId=${offer.variantId} products=${productIds.length}`,
+      `${tag} resolved shop=${shop} source=${source} offers=${offers.length} discount=${config.discountPercent}`,
     );
-    return data({ offer, source }, { status: 200, headers: corsHeaders(request) });
+    return data(
+      {
+        offers,
+        discountPercent: config.discountPercent,
+        source,
+      },
+      { status: 200, headers: corsHeaders(request) },
+    );
   } catch (err) {
     console.error(`${tag} lookup failed for shop=${shop}`, err);
-    return data({ error: "offer lookup failed" }, { status: 500, headers: corsHeaders(request) });
+    return data(
+      { error: "offer lookup failed" },
+      { status: 500, headers: corsHeaders(request) },
+    );
   }
 };
 

@@ -63,10 +63,19 @@ description = "An offer shown on the post-purchase page. Multiple offers allowed
   admin = "merchant_read_write"
 
 [metaobjects.app.post_purchase_offer.fields.offer]
-name = "Offer JSON"
+name = "Offer JSON (legacy single-variant)"
 type = "json"
-description = "{variantId:number, quantity:number, productTitle:string, description:string, imageUrl:string|null, discount:{value:number,valueType:'percentage'|'fixed_amount',title:string}}"
-required = true
+description = "Legacy single-variant JSON. Prefer variant_ids + discount_percent below. Kept for backwards compat."
+
+[metaobjects.app.post_purchase_offer.fields.variant_ids]
+name = "Variant IDs"
+type = "list.variant_reference"
+description = "List of product variants offered on both post-purchase and checkout surfaces. The extension picks one at a time via the carousel."
+
+[metaobjects.app.post_purchase_offer.fields.discount_percent]
+name = "Discount percent"
+type = "number_integer"
+description = "Percent off applied to any variant in this list (0-100). Default 20."
 
 [metaobjects.app.post_purchase_offer.fields.trigger_product]
 name = "Trigger product"

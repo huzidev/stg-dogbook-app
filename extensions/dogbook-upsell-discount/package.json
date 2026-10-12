@@ -1,0 +1,25 @@
+{
+  "name": "dogbook-upsell-discount",
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "shopify": "npm exec --package=@shopify/cli@latest -- shopify",
+    "typegen": "npm run shopify -- app function typegen",
+    "build": "npm run shopify -- app function build",
+    "preview": "npm run shopify -- app function run"
+  },
+  "codegen": {
+    "schema": "schema.graphql",
+    "documents": "src/*.graphql",
+    "generates": {
+      "generated/api.ts": {
+        "plugins": ["typescript", "typescript-operations"]
+      }
+    }
+  },
+  "dependencies": {
+    "@shopify/shopify_function": "^1.0.0",
+    "javy": "^0.1.0"
+  }
+}

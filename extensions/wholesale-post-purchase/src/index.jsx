@@ -1,115 +1,111 @@
-import React, { useEffect, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useState } from "react";
 import {
   extend,
   render,
   useExtensionInput,
-  Banner,
   BlockStack,
   Button,
-  ButtonGroup,
-  CalloutBanner,
   Heading,
   Image,
   InlineStack,
   Layout,
+  Pressable,
   Separator,
   Text,
   TextBlock,
+  Tiles,
+  View,
 } from "@shopify/post-purchase-ui-extensions-react";
 
-// =====================================================================
-// Offer source: shop metafield `app.post_purchase_offer`, resolved via
-// GET /api/post-purchase/offer?shop=<domain>. Merchant edits it in
-// Shopify Admin → Settings → Custom data → Shop (or via the embedded
-// app settings page). See docs/plan/07-post-purchase-extension.md.
-// =====================================================================
+import {
+  COLORS,
+  POST_PURCHASE_OFFER_SECONDS,
+} from "../../_shared/tokens.js";
+import {
+  fetchOffers,
+  filterNotInCart,
+  formatMMSS,
+  formatMoney,
+  toVariantGid,
+} from "../../_shared/useOffers.js";
 
-// TODO per environment:
-//   local dev: paste the `shopify app dev` tunnel URL printed by the CLI
-//   staging:   https://stg-dogbook-app.vercel.app
+// Switch per environment: local tunnel URL for `shopify app dev`,
+// stg-dogbook-app for Vercel preview, prod URL for prod.
 const APP_URL = "https://stg-dogbook-app.vercel.app";
-
-// =====================================================================
-
-const offerToChanges = (offer) => [
-  {
-    type: "add_variant",
-    variantId: offer.variantId,
-    quantity: offer.quantity ?? 1,
-    discount: offer.discount,
-  },
-];
-
-const fetchOffer = async (shopDomain, productIds) => {
-  if (!shopDomain) return null;
-  const params = new URLSearchParams({ shop: shopDomain });
-  if (productIds.length) params.set("product_ids", productIds.join(","));
-  try {
-    const res = await fetch(`${APP_URL}/api/post-purchase/offer?${params.toString()}`);
-    if (!res.ok) return null;
-    const body = await res.json();
-    return body?.offer ?? null;
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error("[post-purchase] fetchOffer failed", err);
-    return null;
-  }
-};
-
-const extractProductIds = (initialPurchase) =>
-  (initialPurchase?.lineItems ?? [])
-    .map((li) => li?.product?.id)
-    .filter((id) => id != null)
-    .map(String);
 
 extend("Checkout::PostPurchase::ShouldRender", async ({ inputData, storage }) => {
   const shopDomain = inputData?.shop?.domain;
-  const productIds = extractProductIds(inputData?.initialPurchase);
-  const offer = await fetchOffer(shopDomain, productIds);
-  if (!offer?.variantId) return { render: false };
-  await storage.update({ offer });
+  const purchasedProductIds = (inputData?.initialPurchase?.lineItems ?? [])
+    .map((li) => li?.product?.id)
+    .filter(Boolean)
+    .map(String);
+  const purchasedVariantGids = (inputData?.initialPurchase?.lineItems ?? [])
+    .map((li) => li?.product?.variant?.id ?? li?.productVariantId)
+    .filter(Boolean)
+    .map(toVariantGid);
+
+  const { offers, discountPercent } = await fetchOffers(APP_URL, {
+    shopDomain,
+    productIds: purchasedProductIds,
+  });
+  const filtered = filterNotInCart(offers, purchasedVariantGids);
+  if (!filtered.length) return { render: false };
+
+  const orderId = inputData?.initialPurchase?.referenceId ?? null;
+  await storage.update({
+    offers: filtered,
+    discountPercent,
+    orderName: orderId ? `#${String(orderId).slice(-4)}` : null,
+  });
   return { render: true };
 });
 
 render("Checkout::PostPurchase::Render", () => <App />);
 
 export function App() {
-  const { storage, inputData, calculateChangeset, applyChangeset, done } =
-    useExtensionInput();
+  const { storage, inputData, applyChangeset, done } = useExtensionInput();
+  const { offers = [], discountPercent = 20, orderName } = storage.initialData ?? {};
 
-  // storage.initialData.offer is set in ShouldRender — if we got here it exists.
-  const offer = storage.initialData.offer;
-  const changes = offerToChanges(offer);
-
-  const [calc, setCalc] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  // browsing | accepted | declined | expired
+  const [state, setState] = useState("browsing");
+  const [secondsLeft, setSecondsLeft] = useState(POST_PURCHASE_OFFER_SECONDS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  // Deadline-based countdown — immune to background throttling.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await calculateChangeset({ changes });
-        if (!cancelled) setCalc(result.calculatedPurchase);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error("[post-purchase] calculateChangeset failed", err);
-        if (!cancelled) setError("Could not calculate this offer.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (state !== "browsing") return undefined;
+    const deadline = Date.now() + secondsLeft * 1000;
+    const tick = setInterval(() => {
+      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left === 0) setState("expired");
+    }, 1000);
+    return () => clearInterval(tick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [state]);
+
+  const selected = offers[selectedIdx];
 
   const accept = async () => {
+    if (!selected) return;
     setSubmitting(true);
     setError(null);
     try {
+      const changes = [
+        {
+          type: "add_variant",
+          variantId: Number(selected.variantId),
+          quantity: 1,
+          discount: {
+            value: discountPercent,
+            valueType: "percentage",
+            title: `Post-purchase ${discountPercent}% off`,
+          },
+        },
+      ];
       const res = await fetch(`${APP_URL}/api/post-purchase/sign`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -119,152 +115,299 @@ export function App() {
           changes,
         }),
       });
-      if (!res.ok) {
-        throw new Error(`sign endpoint returned ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`sign endpoint returned ${res.status}`);
       const { token } = await res.json();
       await applyChangeset(token);
-      done();
+      setState("accepted");
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[post-purchase] accept failed", err);
-      setSubmitting(false);
       setError("We couldn't add the offer. Skip and we'll follow up.");
+      setSubmitting(false);
     }
   };
 
-  const decline = () => done();
+  if (!selected) {
+    // ShouldRender filtered everything out — defensive, shouldn't happen.
+    return null;
+  }
 
-  if (loading) {
+  if (state !== "browsing") {
     return (
-      <BlockStack spacing="loose">
-        <CalloutBanner title="One moment">
-          <TextBlock>Preparing your offer…</TextBlock>
-        </CalloutBanner>
-      </BlockStack>
+      <TerminalPanel
+        state={state}
+        offer={selected}
+        onDone={done}
+        onReset={() => {
+          setSecondsLeft(POST_PURCHASE_OFFER_SECONDS);
+          setState("browsing");
+          setSubmitting(false);
+        }}
+      />
     );
   }
 
-  const presentment = calc?.totalOutstandingSet?.presentmentMoney;
-  const currencyCode = presentment?.currencyCode ?? "USD";
-  const total = presentment?.amount;
-  const line = calc?.updatedLineItems?.[0];
-  const originalPrice = line?.priceSet?.presentmentMoney?.amount;
-  const discountedPrice = line?.totalPriceSet?.presentmentMoney?.amount;
-  const showDiscount =
-    originalPrice != null &&
-    discountedPrice != null &&
-    Number(originalPrice) !== Number(discountedPrice);
-  const savings = showDiscount
-    ? (Number(originalPrice) - Number(discountedPrice)).toFixed(2)
-    : null;
-  const fmt = (amount) =>
-    `${currencyCode} ${Number(amount ?? 0).toFixed(2)}`;
-
-  const hasImage = Boolean(offer.imageUrl);
-
-  // Layout with sizes ['fill', 'auto'] → label fills remaining space, value hugs right.
-  const PriceRow = ({ label, value, strike, emphasized, appearance }) => (
-    <Layout sizes={["fill", "auto"]}>
-      <Text subdued={!emphasized}>{label}</Text>
-      <Text
-        emphasized={emphasized}
-        appearance={appearance}
-        role={strike ? "deletion" : undefined}
-      >
-        {value}
-      </Text>
+  return (
+    <Layout maxInlineSize={900} inlineAlignment="center">
+      <View padding="loose" background={COLORS.card} border="base">
+        <BlockStack spacing="loose">
+          <OrderConfirmedRow orderName={orderName} />
+          <OfferBanner secondsLeft={secondsLeft} discountPercent={discountPercent} />
+          <BreedCarousel
+            offers={offers}
+            selectedIdx={selectedIdx}
+            onSelect={setSelectedIdx}
+          />
+          <ActionRow
+            offer={selected}
+            discountPercent={discountPercent}
+            onAdd={accept}
+            submitting={submitting}
+          />
+          {error && (
+            <Text appearance="critical">{error}</Text>
+          )}
+          <TrustRow />
+          <View inlineAlignment="center">
+            <Pressable onPress={() => setState("declined")}>
+              <Text appearance="subdued">No thanks</Text>
+            </Pressable>
+          </View>
+        </BlockStack>
+      </View>
     </Layout>
   );
+}
 
-  const Content = (
-    <BlockStack spacing="loose">
-      <BlockStack spacing="tight">
-        <InlineStack spacing="tight" alignment="leading">
-          <Heading level={2}>{offer.productTitle}</Heading>
-          {showDiscount && (
-            <Text emphasized appearance="success">
-              Save {offer.discount.value}
-              {offer.discount.valueType === "percentage" ? "%" : ""}
-            </Text>
-          )}
-        </InlineStack>
-        <TextBlock subdued>{offer.description}</TextBlock>
-      </BlockStack>
+function OrderConfirmedRow({ orderName }) {
+  return (
+    <View inlineAlignment="center">
+      <InlineStack spacing="tight" blockAlignment="center">
+        {/* ponytail: no CheckCircle2 icon primitive; approximate with the ✓ glyph
+            tinted to the accent color via Text appearance. */}
+        <Text emphasized appearance="success">
+          ✓ Order {orderName ?? ""} confirmed
+        </Text>
+      </InlineStack>
+    </View>
+  );
+}
 
-      <Separator />
+function OfferBanner({ secondsLeft, discountPercent }) {
+  return (
+    <View
+      padding="base"
+      border="base"
+      cornerRadius="none"
+      background={COLORS.accentTint}
+    >
+      <InlineStack spacing="loose" blockAlignment="center">
+        <BlockStack spacing="tight">
+          <Heading level={2}>
+            Add a book, save {discountPercent}% off your next order
+          </Heading>
+          <InlineStack spacing="tight">
+            {/* −20% pill */}
+            <View
+              padding="extraTight"
+              background={COLORS.accent}
+              cornerRadius="none"
+            >
+              <Text size="small" emphasized appearance="monochrome">
+                −{discountPercent}%
+              </Text>
+            </View>
+            {/* $0 EXTRA SHIPPING pill */}
+            <View padding="extraTight" border="base" cornerRadius="none">
+              <Text size="small" emphasized appearance="success">
+                $0 EXTRA SHIPPING
+              </Text>
+            </View>
+          </InlineStack>
+        </BlockStack>
+        <BlockStack spacing="none" inlineAlignment="trailing">
+          {/* ponytail: tabular-nums + monospace is automatic in post-purchase
+              typography. extraLarge ≈ 24-30px, not the 60px desktop target,
+              but it's the biggest size the primitive exposes. */}
+          <Text size="extraLarge" emphasized appearance="success">
+            {formatMMSS(secondsLeft)}
+          </Text>
+          <Text size="small" appearance="subdued">
+            OFFER ENDS IN
+          </Text>
+        </BlockStack>
+      </InlineStack>
+    </View>
+  );
+}
 
-      <BlockStack spacing="tight">
-        {showDiscount && (
-          <PriceRow
-            label="Regular price"
-            value={fmt(originalPrice)}
-            strike
-          />
-        )}
-        <PriceRow
-          label={showDiscount ? "Your price" : "Price"}
-          value={fmt(discountedPrice ?? originalPrice)}
-          emphasized
-        />
-        {savings && (
-          <PriceRow
-            label="You save"
-            value={fmt(savings)}
-            emphasized
-            appearance="success"
-          />
-        )}
-      </BlockStack>
-
-      {total != null && (
-        <>
-          <Separator />
-          <PriceRow
-            label="New order total"
-            value={fmt(total)}
-            emphasized
-          />
-        </>
-      )}
-
-      {error && (
-        <Banner status="critical" title="Something went wrong">
-          <TextBlock>{error}</TextBlock>
-        </Banner>
-      )}
-
-      <ButtonGroup>
-        <Button submit onPress={accept} loading={submitting}>
-          Pay now · {fmt(discountedPrice ?? 0)}
+function BreedCarousel({ offers, selectedIdx, onSelect }) {
+  // ponytail: no horizontal-scroll primitive; approximate the carousel with a
+  // Tiles grid that wraps. ← / → arrows work, swipe does not. Upgrade path:
+  // when the extension API exposes ScrollView, swap `Tiles` for a scroller.
+  const canPrev = selectedIdx > 0;
+  const canNext = selectedIdx < offers.length - 1;
+  return (
+    <BlockStack spacing="tight">
+      <Tiles maxPerLine={5} spacing="tight">
+        {offers.map((offer, i) => (
+          <Pressable key={offer.variantId} onPress={() => onSelect(i)}>
+            <View
+              padding="tight"
+              border="base"
+              cornerRadius="none"
+              background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
+            >
+              <BlockStack spacing="tight" inlineAlignment="center">
+                {offer.imageUrl ? (
+                  <Image
+                    source={offer.imageUrl}
+                    description={offer.productTitle}
+                    aspectRatio={0.75}
+                    fit="cover"
+                  />
+                ) : (
+                  <View
+                    padding="loose"
+                    background={COLORS.secondary}
+                    cornerRadius="none"
+                  >
+                    <Text size="small" emphasized>
+                      {String(i + 1).padStart(2, "0")}
+                    </Text>
+                  </View>
+                )}
+                <Text size="small" emphasized>
+                  {offer.productTitle}
+                </Text>
+              </BlockStack>
+            </View>
+          </Pressable>
+        ))}
+      </Tiles>
+      <InlineStack spacing="base" blockAlignment="center">
+        <Text appearance="subdued" size="small">
+          Swipe →
+        </Text>
+        <Text appearance="subdued" size="small" emphasized>
+          {selectedIdx + 1} / {offers.length}
+        </Text>
+        <Button
+          plain
+          onPress={() => canPrev && onSelect(selectedIdx - 1)}
+          disabled={!canPrev}
+          accessibilityLabel="Previous breed"
+        >
+          ←
         </Button>
-        <Button plain onPress={decline} disabled={submitting}>
-          No thanks, continue to confirmation
+        <Button
+          plain
+          onPress={() => canNext && onSelect(selectedIdx + 1)}
+          disabled={!canNext}
+          accessibilityLabel="Next breed"
+        >
+          →
         </Button>
-      </ButtonGroup>
+      </InlineStack>
     </BlockStack>
   );
+}
 
+function ActionRow({ offer, discountPercent, onAdd, submitting }) {
+  const compareAt = offer.compareAtPrice ?? offer.price;
+  const discounted = computeDiscounted(offer.price ?? compareAt, discountPercent);
   return (
-    <Layout maxInlineSize={560}>
-      <BlockStack spacing="loose">
-        <CalloutBanner title="One more thing before you go">
-          <TextBlock>
-            Add this to your order — no extra shipping, same confirmation email.
-          </TextBlock>
-        </CalloutBanner>
-
-        {hasImage && (
+    <>
+      <Separator />
+      <InlineStack spacing="base" blockAlignment="center">
+        {offer.imageUrl && (
           <Image
             source={offer.imageUrl}
             description={offer.productTitle}
-            aspectRatio={1.6}
+            aspectRatio={0.75}
             fit="cover"
           />
         )}
+        <BlockStack spacing="tight">
+          <Text emphasized>{offer.productTitle}</Text>
+          <InlineStack spacing="tight" blockAlignment="center">
+            {compareAt && Number(compareAt) !== Number(discounted) && (
+              <Text appearance="subdued" role="deletion">
+                {formatMoney(compareAt)}
+              </Text>
+            )}
+            <Text size="large" emphasized>
+              {formatMoney(discounted)}
+            </Text>
+          </InlineStack>
+        </BlockStack>
+        <Button
+          submit
+          onPress={onAdd}
+          loading={submitting}
+          accessibilityLabel={`Add ${offer.productTitle} for ${formatMoney(discounted)}`}
+        >
+          ADD — {formatMoney(discounted)}
+        </Button>
+      </InlineStack>
+    </>
+  );
+}
 
-        {Content}
-      </BlockStack>
+function TrustRow() {
+  return (
+    <View inlineAlignment="center">
+      <Text size="small" appearance="subdued">
+        🔒 One click · ships together · no card details
+      </Text>
+    </View>
+  );
+}
+
+function TerminalPanel({ state, offer, onDone, onReset }) {
+  const headline =
+    state === "accepted"
+      ? "Added to your order"
+      : state === "declined"
+      ? "Your order is all set"
+      : "This offer has ended";
+  const supporting =
+    state === "accepted"
+      ? `Your ${offer.productTitle} ships with your order — no extra shipping.`
+      : state === "declined"
+      ? "Your order is confirmed."
+      : null;
+
+  return (
+    <Layout maxInlineSize={512} inlineAlignment="center">
+      <View padding="loose" inlineAlignment="center">
+        <BlockStack spacing="loose" inlineAlignment="center">
+          <Text size="extraLarge" emphasized appearance="success">
+            ✓
+          </Text>
+          <Heading level={2}>{headline}</Heading>
+          {supporting && (
+            <TextBlock subdued>{supporting}</TextBlock>
+          )}
+          <Button submit onPress={onDone}>
+            Continue to confirmation
+          </Button>
+          {/* ponytail: dev-only reset — remove before shipping to prod. */}
+          {state !== "accepted" && (
+            <Pressable onPress={onReset}>
+              <Text appearance="subdued" size="small">
+                Back to the offer
+              </Text>
+            </Pressable>
+          )}
+        </BlockStack>
+      </View>
     </Layout>
   );
+}
+
+function computeDiscounted(price, discountPercent) {
+  const n = Number(price);
+  if (!Number.isFinite(n)) return price;
+  return (n * (1 - discountPercent / 100)).toFixed(2);
 }

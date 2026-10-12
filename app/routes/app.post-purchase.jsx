@@ -2,159 +2,199 @@ import { useEffect, useState } from "react";
 import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
 import { authenticate } from "../shopify.server";
 
-const METAFIELD_NAMESPACE = "app";
-const METAFIELD_KEY = "post_purchase_offer";
+const METAOBJECT_TYPE = "app--post_purchase_offer";
+const DEFAULT_HANDLE = "default-offer";
+const DEFAULT_DISCOUNT = 20;
 
-const emptyOffer = () => ({
-  variantId: "",
-  quantity: 1,
-  productTitle: "",
-  description: "",
-  imageUrl: "",
-  discount: { value: 10, valueType: "percentage", title: "Post-purchase discount" },
-});
+const gidToNumeric = (gid) => (gid ? String(gid).split("/").pop() : null);
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
-  const resp = await admin.graphql(`
-    #graphql
-    query PostPurchaseOffer {
-      shop {
+
+  // Look up the metaobject by handle; if missing, show an empty form.
+  const resp = await admin.graphql(
+    `#graphql
+    query DefaultOffer($handle: MetaobjectHandleInput!) {
+      metaobjectByHandle(handle: $handle) {
         id
-        metafield(namespace: "${METAFIELD_NAMESPACE}", key: "${METAFIELD_KEY}") { id value }
+        handle
+        fields {
+          key
+          value
+          references(first: 50) {
+            nodes {
+              ... on ProductVariant {
+                id
+                title
+                price
+                image { url altText }
+                product { title featuredImage { url altText } }
+              }
+            }
+          }
+        }
       }
-    }
-  `);
+    }`,
+    { variables: { handle: { type: METAOBJECT_TYPE, handle: DEFAULT_HANDLE } } },
+  );
   const body = await resp.json();
-  const shopGid = body?.data?.shop?.id;
-  const raw = body?.data?.shop?.metafield?.value;
-  let offer = emptyOffer();
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      offer = {
-        ...emptyOffer(),
-        ...parsed,
-        discount: { ...emptyOffer().discount, ...(parsed?.discount ?? {}) },
-      };
-    } catch {
-      // ponytail: ignore malformed metafield, show empty form
-    }
+  const node = body?.data?.metaobjectByHandle ?? null;
+
+  let variants = [];
+  let discountPercent = DEFAULT_DISCOUNT;
+  let metaobjectId = null;
+
+  if (node) {
+    metaobjectId = node.id;
+    const map = {};
+    for (const f of node.fields ?? []) map[f.key] = f;
+    const refs = map.variant_ids?.references?.nodes ?? [];
+    variants = refs
+      .filter((r) => r?.id)
+      .map((r) => ({
+        id: r.id,
+        numericId: gidToNumeric(r.id),
+        productTitle: r.product?.title ?? r.title ?? "",
+        variantTitle: r.title ?? "",
+        price: r.price ?? null,
+        imageUrl: r.image?.url ?? r.product?.featuredImage?.url ?? null,
+      }));
+    const dp = Number(map.discount_percent?.value);
+    if (Number.isFinite(dp) && dp > 0) discountPercent = dp;
   }
-  return { offer, shopGid, shopDomain: session.shop };
+
+  return {
+    metaobjectId,
+    variants,
+    discountPercent,
+    shopDomain: session.shop,
+  };
 };
 
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const form = await request.formData();
 
-  const variantIdRaw = String(form.get("variantId") ?? "").trim();
-  const variantId = Number(variantIdRaw);
-  if (!variantIdRaw || !Number.isFinite(variantId) || variantId <= 0) {
-    return { ok: false, error: "Variant ID is required and must be a positive number." };
+  // Variants come in as a repeated hidden input `variantGids`.
+  const variantGids = form.getAll("variantGids").map((g) => String(g)).filter(Boolean);
+  const discountPercent = Math.max(0, Math.min(100, Number(form.get("discountPercent")) || 0));
+
+  if (!variantGids.length) {
+    return { ok: false, error: "Pick at least one variant." };
   }
-
-  const payload = {
-    variantId,
-    quantity: Math.max(1, Number(form.get("quantity") ?? 1) || 1),
-    productTitle: String(form.get("productTitle") ?? "").trim(),
-    description: String(form.get("description") ?? "").trim(),
-    imageUrl: String(form.get("imageUrl") ?? "").trim() || null,
-    discount: {
-      value: Number(form.get("discountValue") ?? 0) || 0,
-      valueType:
-        String(form.get("discountType") ?? "percentage") === "fixed_amount"
-          ? "fixed_amount"
-          : "percentage",
-      title: String(form.get("discountTitle") ?? "Post-purchase discount").trim() ||
-        "Post-purchase discount",
-    },
-  };
-
-  const shopGid = String(form.get("shopGid") ?? "");
-  if (!shopGid) return { ok: false, error: "Missing shop reference." };
 
   const resp = await admin.graphql(
     `#graphql
-    mutation SetPostPurchaseOffer($metafields: [MetafieldsSetInput!]!) {
-      metafieldsSet(metafields: $metafields) {
-        metafields { id namespace key value }
-        userErrors { field message }
+    mutation UpsertOffer($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
+      metaobjectUpsert(handle: $handle, metaobject: $metaobject) {
+        metaobject { id handle }
+        userErrors { field message code }
       }
     }`,
     {
       variables: {
-        metafields: [
-          {
-            ownerId: shopGid,
-            namespace: METAFIELD_NAMESPACE,
-            key: METAFIELD_KEY,
-            type: "json",
-            value: JSON.stringify(payload),
-          },
-        ],
+        handle: { type: METAOBJECT_TYPE, handle: DEFAULT_HANDLE },
+        metaobject: {
+          handle: DEFAULT_HANDLE,
+          fields: [
+            { key: "variant_ids", value: JSON.stringify(variantGids) },
+            { key: "discount_percent", value: String(discountPercent) },
+            { key: "enabled", value: "true" },
+            { key: "priority", value: "0" },
+          ],
+        },
       },
     },
   );
   const body = await resp.json();
-  const errors = body?.data?.metafieldsSet?.userErrors ?? [];
+  const errors = body?.data?.metaobjectUpsert?.userErrors ?? [];
   if (errors.length) {
-    console.error("[post-purchase/settings] metafieldsSet userErrors", errors);
+    console.error("[post-purchase/settings] upsert userErrors", errors);
     return { ok: false, error: errors.map((e) => e.message).join("; ") };
   }
   return { ok: true };
 };
 
 export default function PostPurchaseSettings() {
-  const { offer, shopGid } = useLoaderData();
+  const { variants: loaded, discountPercent: loadedDiscount } = useLoaderData();
   const actionData = useActionData();
   const nav = useNavigation();
   const submitting = nav.state !== "idle";
 
-  const [variantId, setVariantId] = useState(String(offer.variantId ?? ""));
-  const [productTitle, setProductTitle] = useState(offer.productTitle ?? "");
-  const [imageUrl, setImageUrl] = useState(offer.imageUrl ?? "");
+  const [variants, setVariants] = useState(loaded);
+  const [discountPercent, setDiscountPercent] = useState(String(loadedDiscount));
 
-  // ponytail: resource picker lives on window.shopify (App Bridge). Rendering
-  // via effect avoids SSR hitting it.
   const [pickerReady, setPickerReady] = useState(false);
   useEffect(() => {
-    setPickerReady(typeof window !== "undefined" && Boolean(window.shopify?.resourcePicker));
+    setPickerReady(
+      typeof window !== "undefined" && Boolean(window.shopify?.resourcePicker),
+    );
   }, []);
 
-  const pickVariant = async () => {
+  const addVariants = async () => {
     try {
       const picked = await window.shopify.resourcePicker({
         type: "product",
         action: "select",
-        multiple: false,
+        multiple: true,
         filter: { variants: true },
       });
       if (!picked?.length) return;
-      const product = picked[0];
-      const firstVariant = product?.variants?.[0];
-      if (!firstVariant?.id) return;
-      // GID looks like gid://shopify/ProductVariant/67594204676249
-      const numericId = String(firstVariant.id).split("/").pop();
-      setVariantId(numericId);
-      if (product.title) setProductTitle(product.title);
-      if (product.images?.[0]?.originalSrc) setImageUrl(product.images[0].originalSrc);
+      // Each `picked` product has a `variants` array; take the first variant of
+      // each selected product (consistent with the previous single-variant UX).
+      // ponytail: if we need per-variant selection later, open a secondary
+      // picker per product.
+      const next = [...variants];
+      const existing = new Set(variants.map((v) => v.id));
+      for (const product of picked) {
+        const v = product?.variants?.[0];
+        if (!v?.id || existing.has(v.id)) continue;
+        next.push({
+          id: v.id,
+          numericId: gidToNumeric(v.id),
+          productTitle: product.title ?? "",
+          variantTitle: v.title ?? "",
+          price: v.price ?? null,
+          imageUrl: product.images?.[0]?.originalSrc ?? null,
+        });
+        existing.add(v.id);
+      }
+      setVariants(next);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[post-purchase/settings] picker failed", err);
     }
   };
 
+  const removeAt = (idx) =>
+    setVariants(variants.filter((_, i) => i !== idx));
+
+  const moveUp = (idx) => {
+    if (idx === 0) return;
+    const next = [...variants];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    setVariants(next);
+  };
+  const moveDown = (idx) => {
+    if (idx === variants.length - 1) return;
+    const next = [...variants];
+    [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+    setVariants(next);
+  };
+
   return (
     <s-page heading="Post-purchase offer">
       <s-paragraph>
-        Shown to buyers on the thank-you page after their initial payment. Leave the variant
-        empty to disable the extension — it will quietly not render.
+        Pick the books that show in the post-purchase + checkout upsell. Both
+        surfaces render all of them as a carousel. The discount percent applies
+        to any book the buyer picks. Leave the list empty to hide both
+        extensions.
       </s-paragraph>
 
       {actionData?.ok && (
         <s-banner tone="success">
-          Saved. The checkout extension will pick this up on the next order.
+          Saved. Both the post-purchase screen and the checkout right-rail will
+          pick this up on the next render.
         </s-banner>
       )}
       {actionData?.ok === false && (
@@ -164,85 +204,93 @@ export default function PostPurchaseSettings() {
       )}
 
       <Form method="post">
-        <input type="hidden" name="shopGid" value={shopGid ?? ""} />
+        {variants.map((v) => (
+          <input key={v.id} type="hidden" name="variantGids" value={v.id} />
+        ))}
 
         <s-stack direction="block" gap="large-300">
           <s-section heading="Product">
             <s-stack direction="block" gap="base">
-              <s-grid gridTemplateColumns="minmax(0, 1fr) auto" gap="base" alignItems="end">
-                <s-text-field
-                  label="Variant ID"
-                  details="Numeric ID of the product variant to offer."
-                  name="variantId"
-                  value={variantId}
-                  onInput={(e) => setVariantId(e.currentTarget.value)}
-                  required
-                ></s-text-field>
+              <s-stack direction="inline" gap="base" alignItems="center">
+                <s-paragraph>
+                  <strong>{variants.length}</strong>{" "}
+                  {variants.length === 1 ? "variant" : "variants"} selected
+                </s-paragraph>
                 {pickerReady && (
-                  <s-button type="button" onClick={pickVariant}>
-                    Browse products
+                  <s-button type="button" onClick={addVariants}>
+                    Add variants
                   </s-button>
                 )}
-              </s-grid>
+              </s-stack>
 
-              <s-grid gridTemplateColumns="1fr 1fr" gap="base">
-                <s-text-field
-                  label="Product title"
-                  details="Shown to the buyer on the offer page."
-                  name="productTitle"
-                  value={productTitle}
-                  onInput={(e) => setProductTitle(e.currentTarget.value)}
-                ></s-text-field>
-                <s-number-field
-                  label="Quantity"
-                  name="quantity"
-                  min="1"
-                  defaultValue={String(offer.quantity ?? 1)}
-                ></s-number-field>
-              </s-grid>
+              {variants.length === 0 && (
+                <s-paragraph tone="subdued">
+                  No variants yet. Click &ldquo;Add variants&rdquo; to pick books. Each
+                  product&apos;s first variant is used.
+                </s-paragraph>
+              )}
 
-              <s-text-area
-                label="Description"
-                name="description"
-                rows="3"
-                defaultValue={offer.description ?? ""}
-              ></s-text-area>
-
-              <s-text-field
-                label="Image URL"
-                details="Optional. Use the Shopify CDN URL from the product image."
-                name="imageUrl"
-                value={imageUrl}
-                onInput={(e) => setImageUrl(e.currentTarget.value)}
-              ></s-text-field>
+              {variants.map((v, i) => (
+                <s-stack
+                  key={v.id}
+                  direction="inline"
+                  gap="base"
+                  alignItems="center"
+                >
+                  {v.imageUrl ? (
+                    <img
+                      src={v.imageUrl}
+                      alt={v.productTitle}
+                      width={48}
+                      height={48}
+                      style={{ objectFit: "cover" }}
+                    />
+                  ) : (
+                    <s-paragraph tone="subdued">(no image)</s-paragraph>
+                  )}
+                  <s-stack direction="block" gap="tight">
+                    <s-paragraph>
+                      <strong>{v.productTitle}</strong>
+                    </s-paragraph>
+                    <s-paragraph tone="subdued">
+                      {v.variantTitle === "Default Title" ? "" : v.variantTitle}{" "}
+                      · ID {v.numericId}{" "}
+                      {v.price ? `· $${v.price}` : ""}
+                    </s-paragraph>
+                  </s-stack>
+                  <s-button
+                    type="button"
+                    onClick={() => moveUp(i)}
+                    disabled={i === 0 || undefined}
+                  >
+                    ↑
+                  </s-button>
+                  <s-button
+                    type="button"
+                    onClick={() => moveDown(i)}
+                    disabled={i === variants.length - 1 || undefined}
+                  >
+                    ↓
+                  </s-button>
+                  <s-button type="button" onClick={() => removeAt(i)}>
+                    Remove
+                  </s-button>
+                </s-stack>
+              ))}
             </s-stack>
           </s-section>
 
           <s-section heading="Discount">
             <s-stack direction="block" gap="base">
-              <s-grid gridTemplateColumns="1fr 1fr" gap="base">
-                <s-number-field
-                  label="Value"
-                  name="discountValue"
-                  min="0"
-                  defaultValue={String(offer.discount?.value ?? 10)}
-                ></s-number-field>
-                <s-select
-                  label="Type"
-                  name="discountType"
-                  defaultValue={offer.discount?.valueType ?? "percentage"}
-                >
-                  <s-option value="percentage">Percentage (%)</s-option>
-                  <s-option value="fixed_amount">Fixed amount</s-option>
-                </s-select>
-              </s-grid>
-
-              <s-text-field
-                label="Label"
-                details="Shown next to the price on the offer page."
-                name="discountTitle"
-                defaultValue={offer.discount?.title ?? "Post-purchase discount"}
-              ></s-text-field>
+              <s-number-field
+                label="Percent off"
+                details="Applies to every variant in the list. Both surfaces show this as the −N% pill."
+                name="discountPercent"
+                min="0"
+                max="100"
+                value={discountPercent}
+                onInput={(e) => setDiscountPercent(e.currentTarget.value)}
+              ></s-number-field>
             </s-stack>
           </s-section>
 

@@ -1,0 +1,10 @@
+api_version = "2024-10"
+
+[[extensions]]
+name = "dogbook-checkout-upsell"
+handle = "dogbook-checkout-upsell"
+type = "ui_extension"
+
+  [[extensions.targeting]]
+  module = "./src/CheckoutUpsell.jsx"
+  target = "purchase.checkout.cart-line-list.render-after"
