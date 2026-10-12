@@ -29,8 +29,8 @@ export const COLORS = {
 // 10 minutes is the post-purchase countdown. Checkout surface has no timer.
 export const POST_PURCHASE_OFFER_SECONDS = 600;
 
-// Attribute key written on the upsell cart line so the Shopify Function
-// knows to discount it. Must stay in sync with
-// extensions/dogbook-upsell-discount/src/run.js.
+// Attribute written on the upsell cart line. Used today only as a marker for
+// analytics; the 20% discount is applied by a merchant-created automatic
+// discount in Shopify admin (no Shopify Function yet — see README).
 export const UPSELL_SOURCE_KEY = "_upsell_source";
 export const UPSELL_SOURCE_CHECKOUT = "checkout";
