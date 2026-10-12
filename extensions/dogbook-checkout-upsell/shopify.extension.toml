@@ -9,3 +9,6 @@ type = "ui_extension"
   [[extensions.targeting]]
   module = "./src/CheckoutUpsell.jsx"
   target = "purchase.checkout.cart-line-list.render-after"
+
+  [extensions.capabilities]
+  network_access = true
