@@ -27,7 +27,7 @@
 
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import {
   UPSELL_SOURCE_KEY,
@@ -127,15 +127,67 @@ function Extension() {
   const canPrev = selectedIdx > 0;
   const canNext = selectedIdx < offers.length - 1;
 
-  // STEP-B: s-banner tone="success" is the outer wrap. The pre-Step-B
-  // version used `s-stack ... background={COLORS.accentTint}` with a hex
-  // color that the primitive silently drops — the panel rendered grey.
+  // STEP-B2: carousel scroll + grab-to-drag. scrollerRef = the s-scroll-box
+  // host; tileRefs[i] = each s-clickable. Arrow buttons call choose(i) which
+  // both updates selection AND scrolls the tile into view. The useEffect
+  // below wires mousedown/move/up on the scroller host so the whole strip
+  // can be dragged with the mouse (touch already works natively).
+  // Rollback: delete scrollerRef, tileRefs, the useEffect, and swap choose()
+  // back to plain setSelectedIdx() in the arrow onclicks.
+  const scrollerRef = useRef(null);
+  const tileRefs = useRef([]);
+  const choose = (i) => {
+    setSelectedIdx(i);
+    const el = tileRefs.current[i];
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+    }
+  };
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return undefined;
+    let down = false;
+    let startX = 0;
+    let startLeft = 0;
+    const onDown = (e) => {
+      down = true;
+      startX = e.pageX;
+      startLeft = el.scrollLeft ?? 0;
+    };
+    const onMove = (e) => {
+      if (!down) return;
+      el.scrollLeft = startLeft - (e.pageX - startX);
+    };
+    const onUp = () => {
+      down = false;
+    };
+    el.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      el.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [offers.length]);
+
+  // STEP-B2: s-banner → s-box. s-banner reserves ~32px on the left for a
+  // baked-in success icon that eats the narrow rail on mobile. s-box lets
+  // us control padding but drops the green mint accent — the panel is now
+  // a subdued grey with a bordered edge. If the green matters more than
+  // the padding, revert this `s-box` back to the `s-banner tone="success"`
+  // from the previous commit and remove the inner s-heading.
   return (
-    <s-banner
-      tone="success"
-      heading={`Add a book, save ${discountPercent}% off your next order`}
+    <s-box
+      padding="small-200"
+      border="base"
+      borderRadius="none"
+      background="subdued"
     >
-      <s-stack direction="block" gap="base">
+      <s-stack direction="block" gap="small-100">
+        <s-heading size="base">
+          Add a book, save {discountPercent}% off your next order
+        </s-heading>
         {/* STEP-B: tone="success" pills (were tone-less grey before). */}
         <s-stack direction="inline" gap="small-100">
           <s-badge tone="success">−{discountPercent}%</s-badge>
@@ -147,7 +199,7 @@ function Extension() {
             s-grid with N explicit TILE_WIDTH columns = forces single row.
             Pre-Step-B wrapped because s-stack direction="inline" wraps by
             default. */}
-        <s-scroll-box overflow="auto hidden">
+        <s-scroll-box ref={scrollerRef} overflow="auto hidden">
           <s-grid
             gridTemplateColumns={offers.map(() => TILE_WIDTH).join(" ")}
             gap="small-100"
@@ -155,7 +207,8 @@ function Extension() {
             {offers.map((o, i) => (
               <s-clickable
                 key={o.variantGid}
-                onclick={() => setSelectedIdx(i)}
+                ref={(el) => (tileRefs.current[i] = el)}
+                onclick={() => choose(i)}
                 accessibility-label={o.productTitle}
               >
                 <s-box
@@ -210,7 +263,7 @@ function Extension() {
             </s-text>
             <s-button
               variant="secondary"
-              onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
+              onclick={() => canPrev && choose(selectedIdx - 1)}
               disabled={!canPrev || undefined}
               accessibility-label="Previous breed"
             >
@@ -218,7 +271,7 @@ function Extension() {
             </s-button>
             <s-button
               variant="secondary"
-              onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
+              onclick={() => canNext && choose(selectedIdx + 1)}
               disabled={!canNext || undefined}
               accessibility-label="Next breed"
             >
@@ -281,19 +334,27 @@ function Extension() {
           </s-text>
         </s-stack>
       </s-stack>
-    </s-banner>
+    </s-box>
   );
 }
 
-// STEP-B: s-banner replaces the old hex-background s-stack. tone="success"
-// matches the panel while in offer state.
+// STEP-B2: AddedPanel also moves from s-banner → s-box for the same
+// icon/padding reason. Revert hunk alongside the main-panel revert.
 function AddedPanel({ breed }) {
   return (
-    <s-banner tone="success" heading="Added to your order">
-      <s-paragraph>
-        Your {breed} ships with your order — $0 extra shipping.
-      </s-paragraph>
-    </s-banner>
+    <s-box
+      padding="small-200"
+      border="base"
+      borderRadius="none"
+      background="subdued"
+    >
+      <s-stack direction="block" gap="small-100">
+        <s-heading size="base">Added to your order</s-heading>
+        <s-paragraph>
+          Your {breed} ships with your order — $0 extra shipping.
+        </s-paragraph>
+      </s-stack>
+    </s-box>
   );
 }
 
