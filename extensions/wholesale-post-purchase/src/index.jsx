@@ -276,9 +276,15 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
                   </Text>
                 </View>
               )}
-              <Text size="small" emphasized>
-                {offer.productTitle}
-              </Text>
+              {/* STEP-C3: minBlockSize on the title wrapper so one-line
+                  and two-line names produce the same tile height. If this
+                  View prop is dropped by the lib, tiles stay unequal — no
+                  harm, just no improvement. */}
+              <View minBlockSize={36}>
+                <Text size="small" emphasized>
+                  {offer.productTitle}
+                </Text>
+              </View>
             </BlockStack>
           </View>
         ))}

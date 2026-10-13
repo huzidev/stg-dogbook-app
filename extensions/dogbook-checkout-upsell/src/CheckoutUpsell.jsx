@@ -195,22 +195,20 @@ function Extension() {
     };
   }, [offers.length]);
 
-  // STEP-B3-ROLLBACK: `background="success"` on s-box blanked the whole
-  // extension — "success" is only valid as a `tone`, not a `background`
-  // value. Back to safe `subdued`. The green-accent trade is still open:
-  // either accept grey + tight padding (this), or green + icon-padding
-  // (swap to `s-banner tone="success"` as the outer wrap).
+  // STEP-B5: back to green via `s-banner tone="success"` — the only Polaris
+  // primitive that paints a true mint-green panel with a matching border.
+  // Trade: the banner reserves ~32px on the left for its baked-in success
+  // icon. There is no primitive that gives us "green panel with no icon
+  // padding"; `s-box background="success"` is not a valid Polaris value
+  // and blanked the extension when tried.
+  // Rollback: swap this `s-banner` for the prior `s-box background="subdued"`
+  // + inner `s-heading` block to drop the icon (and the green).
   return (
-    <s-box
-      padding="small-200"
-      border="base"
-      borderRadius="none"
-      background="subdued"
+    <s-banner
+      tone="success"
+      heading={`Add a book, save ${discountPercent}% off your next order`}
     >
       <s-stack direction="block" gap="small-100">
-        <s-heading size="base">
-          Add a book, save {discountPercent}% off your next order
-        </s-heading>
         {/* STEP-B: tone="success" pills (were tone-less grey before). */}
         <s-stack direction="inline" gap="small-100">
           <s-badge tone="success">−{discountPercent}%</s-badge>
@@ -265,7 +263,11 @@ function Extension() {
                         </s-box>
                       )}
                     </s-box>
-                    <s-text type="small">{o.productTitle}</s-text>
+                    {/* STEP-B5: fixed min-height on the title area so one-line
+                        and two-line names produce the same tile height. */}
+                    <s-box minBlockSize="36px">
+                      <s-text type="small">{o.productTitle}</s-text>
+                    </s-box>
                   </s-stack>
                 </s-box>
               </s-clickable>
@@ -358,26 +360,18 @@ function Extension() {
           </s-text>
         </s-stack>
       </s-stack>
-    </s-box>
+    </s-banner>
   );
 }
 
-// STEP-B3-ROLLBACK: same rollback as the main panel — subdued, not success.
+// STEP-B5: AddedPanel also back to s-banner tone="success" for the mint fill.
 function AddedPanel({ breed }) {
   return (
-    <s-box
-      padding="small-200"
-      border="base"
-      borderRadius="none"
-      background="subdued"
-    >
-      <s-stack direction="block" gap="small-100">
-        <s-heading size="base">Added to your order</s-heading>
-        <s-paragraph>
-          Your {breed} ships with your order — $0 extra shipping.
-        </s-paragraph>
-      </s-stack>
-    </s-box>
+    <s-banner tone="success" heading="Added to your order">
+      <s-paragraph>
+        Your {breed} ships with your order — $0 extra shipping.
+      </s-paragraph>
+    </s-banner>
   );
 }
 
