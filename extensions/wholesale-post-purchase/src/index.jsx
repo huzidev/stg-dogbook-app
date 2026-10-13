@@ -27,7 +27,6 @@ import {
   toVariantGid,
 } from "../../_shared/useOffers.js";
 
-// Switch per environment
 const APP_URL = "https://stg-dogbook-app.vercel.app";
 
 extend("Checkout::PostPurchase::ShouldRender", async ({ inputData, storage }) => {
@@ -64,12 +63,11 @@ export function App() {
   const { offers = [], discountPercent = 20, orderName } = storage.initialData ?? {};
 
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [state, setState] = useState("browsing"); // browsing | accepted | declined | expired
+  const [state, setState] = useState("browsing");
   const [secondsLeft, setSecondsLeft] = useState(POST_PURCHASE_OFFER_SECONDS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Deadline-based countdown
   useEffect(() => {
     if (state !== "browsing") return undefined;
     const deadline = Date.now() + secondsLeft * 1000;
@@ -138,7 +136,7 @@ export function App() {
             </Text>
           </View>
 
-          {/* Offer banner with large timer on the right */}
+          {/* Offer banner */}
           <OfferBanner
             secondsLeft={secondsLeft}
             discountPercent={discountPercent}
@@ -177,39 +175,37 @@ export function App() {
 function OfferBanner({ secondsLeft, discountPercent }) {
   return (
     <Banner status="success">
-      <BlockStack spacing="tight">
-        <InlineStack spacing="base" blockAlignment="center">
-          {/* Left side: heading + badges */}
-          <BlockStack spacing="tight">
-            <Heading level={2}>
-              Add a book, save {discountPercent}% off your next order
-            </Heading>
+      {/* Two-column layout: left content / right timer */}
+      <InlineStack spacing="base" blockAlignment="center">
+        <BlockStack spacing="tight">
+          <Heading level={2}>
+            Add a book, save {discountPercent}% off your next order
+          </Heading>
 
-            <InlineStack spacing="tight">
-              <View padding="extraTight" border="base" cornerRadius="base">
-                <Text size="small" emphasized appearance="success">
-                  −{discountPercent}%
-                </Text>
-              </View>
-              <View padding="extraTight" border="base" cornerRadius="base">
-                <Text size="small" emphasized appearance="success">
-                  $0 EXTRA SHIPPING
-                </Text>
-              </View>
-            </InlineStack>
-          </BlockStack>
+          <InlineStack spacing="tight">
+            <View padding="extraTight" border="base" cornerRadius="base">
+              <Text size="small" emphasized appearance="success">
+                −{discountPercent}%
+              </Text>
+            </View>
+            <View padding="extraTight" border="base" cornerRadius="base">
+              <Text size="small" emphasized appearance="success">
+                $0 EXTRA SHIPPING
+              </Text>
+            </View>
+          </InlineStack>
+        </BlockStack>
 
-          {/* Right side: large timer */}
-          <BlockStack spacing="none" inlineAlignment="trailing">
-            <Text size="extraLarge" emphasized appearance="success">
-              {formatMMSS(secondsLeft)}
-            </Text>
-            <Text size="small" appearance="subdued">
-              OFFER ENDS IN
-            </Text>
-          </BlockStack>
-        </InlineStack>
-      </BlockStack>
+        {/* Large timer on the right */}
+        <BlockStack spacing="none" inlineAlignment="trailing">
+          <Text size="extraLarge" emphasized appearance="success">
+            {formatMMSS(secondsLeft)}
+          </Text>
+          <Text size="small" appearance="subdued">
+            OFFER ENDS IN
+          </Text>
+        </BlockStack>
+      </InlineStack>
     </Banner>
   );
 }
@@ -219,10 +215,8 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
   const canNext = selectedIdx < offers.length - 1;
 
   return (
-    <BlockStack spacing="tight">
-      {/* Tiles approximate the horizontal carousel.
-          With ≤5 items it stays on one row. */}
-      <Tiles maxPerLine={5} spacing="tight">
+    <BlockStack spacing="base">
+      <Tiles maxPerLine={5} spacing="base">
         {offers.map((offer, i) => {
           const isSelected = i === selectedIdx;
           return (
@@ -248,24 +242,22 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
                     </Text>
                   </View>
                 )}
-                <View minBlockSize={36}>
-                  <Text size="small" emphasized>
-                    {offer.productTitle}
-                  </Text>
-                </View>
+                <Text size="small" emphasized>
+                  {offer.productTitle}
+                </Text>
               </BlockStack>
             </View>
           );
         })}
       </Tiles>
 
-      {/* Swipe hint + counter + arrows */}
+      {/* Navigation row – properly split left / right */}
       <InlineStack spacing="base" blockAlignment="center">
         <Text appearance="subdued" size="small">
           Swipe →
         </Text>
 
-        <View inlineAlignment="trailing">
+        <View>
           <InlineStack spacing="tight" blockAlignment="center">
             <Text appearance="subdued" size="small" emphasized>
               {selectedIdx + 1} / {offers.length}
@@ -274,7 +266,7 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
               plain
               onPress={() => canPrev && onSelect(selectedIdx - 1)}
               disabled={!canPrev}
-              accessibilityLabel="Previous breed"
+              accessibilityLabel="Previous"
             >
               ←
             </Button>
@@ -282,7 +274,7 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
               plain
               onPress={() => canNext && onSelect(selectedIdx + 1)}
               disabled={!canNext}
-              accessibilityLabel="Next breed"
+              accessibilityLabel="Next"
             >
               →
             </Button>
@@ -304,6 +296,7 @@ function ActionRow({ offer, discountPercent, onAdd, submitting }) {
     <>
       <Separator />
       <InlineStack spacing="base" blockAlignment="center">
+        {/* Thumbnail */}
         {offer.imageUrl && (
           <Image
             source={offer.imageUrl}
@@ -312,7 +305,9 @@ function ActionRow({ offer, discountPercent, onAdd, submitting }) {
             fit="cover"
           />
         )}
-        <BlockStack spacing="tight">
+
+        {/* Title + prices */}
+        <BlockStack spacing="extraTight">
           <Text emphasized>{offer.productTitle}</Text>
           <InlineStack spacing="tight" blockAlignment="center">
             {compareAt && Number(compareAt) !== Number(discounted) && (
@@ -326,11 +321,12 @@ function ActionRow({ offer, discountPercent, onAdd, submitting }) {
           </InlineStack>
         </BlockStack>
 
+        {/* ADD button */}
         <Button
           submit
           onPress={onAdd}
           loading={submitting}
-          accessibilityLabel={`Add ${offer.productTitle} for ${formatMoney(discounted)}`}
+          accessibilityLabel={`Add ${offer.productTitle}`}
         >
           ADD — {formatMoney(discounted)}
         </Button>
@@ -343,7 +339,7 @@ function TrustRow() {
   return (
     <View inlineAlignment="center">
       <Text size="small" appearance="subdued">
-        🔒 One click hello world · ships together · no card details
+        🔒 One click · ships together · no card details
       </Text>
     </View>
   );
