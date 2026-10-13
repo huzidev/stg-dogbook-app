@@ -1,16 +1,35 @@
 /** @jsxImportSource preact */
 /* eslint-disable no-undef, react/no-unknown-property */
 // Checkout UI extension, 2025-10 API.
-// Layout mirrors docs/post-purchase/03-checkout-cross-sell.md as closely as
-// Shopify's Polaris checkout web components allow (fixed component library,
-// no arbitrary CSS).
+//
+// STEP-B rewrite — visual pass to get closer to the Lovable mock in
+// docs/post-purchase/03-checkout-cross-sell.md. Every change vs the
+// pre-Step-B version is marked with a `STEP-B:` comment so a rollback
+// can either `git revert` the commit or grep + revert line by line.
+//
+// What changed vs pre-Step-B (all visual, no data-flow change):
+//   • Outer wrap: s-stack with hex `background` → s-banner tone="success".
+//     Polaris web components silently drop hex colors; s-banner is the
+//     only primitive that paints the mint accent + border Lovable shows.
+//   • Carousel: wrapping s-stack direction="inline" → s-grid with N
+//     explicit TILE_WIDTH columns inside an s-scroll-box. Forces a
+//     single horizontal row that scrolls natively.
+//   • Tile cover: unconstrained s-image → fixed s-box (COVER_WIDTH x
+//     COVER_HEIGHT) with the image filling it. Images no longer blow out.
+//   • Badges: tone-less → tone="success" for the green pill look.
+//   • Action-row cover: manual s-image + fallback → s-product-thumbnail
+//     (built-in placeholder, consistent sizing).
+//   • AddedPanel: hex-background s-stack → s-banner tone="success".
+//
+// Rollback: `git revert <this commit>`. Backend fetch (fetchOffers,
+// applyCartLinesChange, UPSELL_SOURCE attribute) is unchanged — the
+// pre-Step-B JSX restores one-for-one.
 
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 
 import {
-  COLORS,
   UPSELL_SOURCE_KEY,
   UPSELL_SOURCE_CHECKOUT,
 } from "../../_shared/tokens.js";
@@ -21,7 +40,11 @@ import {
   formatMoney,
 } from "../../_shared/useOffers.js";
 
+// STEP-B: narrow 118px tile = Lovable right-rail book shape; 80x100 cover
+// well inside leaves room for the breed name without wrapping on 2 lines.
 const TILE_WIDTH = "118px";
+const COVER_WIDTH = "80px";
+const COVER_HEIGHT = "100px";
 
 export default function () {
   render(<Extension />, document.body);
@@ -29,7 +52,9 @@ export default function () {
 
 function Extension() {
   const [lines, setLines] = useState(() => shopify.lines.value ?? []);
-  const [shopInfo, setShopInfo] = useState(() => shopify.shop?.value ?? shopify.shop ?? {});
+  const [shopInfo, setShopInfo] = useState(
+    () => shopify.shop?.value ?? shopify.shop ?? {},
+  );
 
   useEffect(() => shopify.lines?.subscribe?.((n) => setLines(n ?? [])), []);
   useEffect(() => shopify.shop?.subscribe?.((n) => setShopInfo(n ?? {})), []);
@@ -64,12 +89,16 @@ function Extension() {
     };
   }, [myshopifyDomain, lines.length]);
 
-  // ponytail: silent fallback instead of a debug stack; nothing to show = nothing rendered
+  // ponytail: silent fallback instead of a debug stack; nothing to show =
+  // nothing rendered.
   if (loading || !offers.length) return null;
 
   const selected = offers[selectedIdx];
   const compareAt = selected.compareAtPrice ?? selected.price;
-  const discounted = computeDiscounted(selected.price ?? compareAt, discountPercent);
+  const discounted = computeDiscounted(
+    selected.price ?? compareAt,
+    discountPercent,
+  );
 
   const add = async () => {
     setSubmitting(true);
@@ -98,142 +127,173 @@ function Extension() {
   const canPrev = selectedIdx > 0;
   const canNext = selectedIdx < offers.length - 1;
 
+  // STEP-B: s-banner tone="success" is the outer wrap. The pre-Step-B
+  // version used `s-stack ... background={COLORS.accentTint}` with a hex
+  // color that the primitive silently drops — the panel rendered grey.
   return (
-    <s-stack
-      direction="block"
-      gap="base"
-      padding="base"
-      border="base"
-      background={COLORS.accentTint}
+    <s-banner
+      tone="success"
+      heading={`Add a book, save ${discountPercent}% off your next order`}
     >
-      <s-heading size="large-100">
-        Add a book, save {discountPercent}% off your next order
-      </s-heading>
-
-      <s-stack direction="inline" gap="small-100">
-        <s-badge size="small">−{discountPercent}%</s-badge>
-        <s-badge size="small" tone="neutral">$0 EXTRA SHIPPING</s-badge>
-      </s-stack>
-
-      <s-scroll-box overflow="auto hidden">
+      <s-stack direction="block" gap="base">
+        {/* STEP-B: tone="success" pills (were tone-less grey before). */}
         <s-stack direction="inline" gap="small-100">
-          {offers.map((o, i) => (
-            <s-clickable
-              key={o.variantId}
-              onclick={() => setSelectedIdx(i)}
-              accessibility-label={o.productTitle}
-            >
-              <s-box
-                minInlineSize={TILE_WIDTH}
-                maxInlineSize={TILE_WIDTH}
-                padding="small-100"
-                border="base"
-                background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
+          <s-badge tone="success">−{discountPercent}%</s-badge>
+          <s-badge tone="success">$0 EXTRA SHIPPING</s-badge>
+        </s-stack>
+
+        {/* STEP-B: horizontal-scroll carousel.
+            s-scroll-box with overflow="auto hidden" = scroll inline only.
+            s-grid with N explicit TILE_WIDTH columns = forces single row.
+            Pre-Step-B wrapped because s-stack direction="inline" wraps by
+            default. */}
+        <s-scroll-box overflow="auto hidden">
+          <s-grid
+            gridTemplateColumns={offers.map(() => TILE_WIDTH).join(" ")}
+            gap="small-100"
+          >
+            {offers.map((o, i) => (
+              <s-clickable
+                key={o.variantGid}
+                onclick={() => setSelectedIdx(i)}
+                accessibility-label={o.productTitle}
               >
-                <s-stack direction="block" gap="small-100" alignInline="center">
-                  {o.imageUrl ? (
-                    <s-image src={o.imageUrl} alt={o.productTitle} objectFit="cover" />
-                  ) : (
-                    <s-box
-                      padding="small-100"
-                      background={COLORS.secondary}
-                      minBlockSize="80px"
-                    >
-                      <s-text type="small" tone="neutral">
-                        {String(i + 1).padStart(2, "0")}
-                      </s-text>
+                <s-box
+                  padding="small-100"
+                  border="base"
+                  borderRadius="none"
+                  background={i === selectedIdx ? "subdued" : "base"}
+                >
+                  <s-stack direction="block" gap="small-200" alignInline="center">
+                    {/* STEP-B: fixed-size cover well so s-image doesn't
+                        fill the whole tile. */}
+                    <s-box inlineSize={COVER_WIDTH} blockSize={COVER_HEIGHT}>
+                      {o.imageUrl ? (
+                        <s-image
+                          src={o.imageUrl}
+                          alt={o.productTitle}
+                          inlineSize="fill"
+                          blockSize="fill"
+                          objectFit="cover"
+                        />
+                      ) : (
+                        <s-box
+                          inlineSize="fill"
+                          blockSize="fill"
+                          background="subdued"
+                        >
+                          <s-text type="small">
+                            {String(i + 1).padStart(2, "0")}
+                          </s-text>
+                        </s-box>
+                      )}
                     </s-box>
-                  )}
-                  <s-text type="small">{o.productTitle}</s-text>
-                </s-stack>
-              </s-box>
-            </s-clickable>
-          ))}
-        </s-stack>
-      </s-scroll-box>
+                    <s-text type="small">{o.productTitle}</s-text>
+                  </s-stack>
+                </s-box>
+              </s-clickable>
+            ))}
+          </s-grid>
+        </s-scroll-box>
 
-      <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
-        <s-text type="small" tone="neutral">Swipe →</s-text>
-        <s-stack direction="inline" gap="small-100" alignItems="center">
+        {/* Swipe label + counter + arrows. Arrows only change which tile is
+            selected below — s-scroll-box has no programmatic scrollTo, so
+            we can't auto-chase the selection. Native touch/trackpad swipe
+            is the only way to actually move the strip. */}
+        <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
           <s-text type="small" tone="neutral">
-            {selectedIdx + 1} / {offers.length}
+            Swipe →
           </s-text>
-          <s-button
-            variant="secondary"
-            onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
-            disabled={!canPrev || undefined}
-            accessibility-label="Previous breed"
-          >
-            <s-icon type="arrow-left" size="small" />
-          </s-button>
-          <s-button
-            variant="secondary"
-            onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
-            disabled={!canNext || undefined}
-            accessibility-label="Next breed"
-          >
-            <s-icon type="arrow-right" size="small" />
-          </s-button>
-        </s-stack>
-      </s-grid>
+          <s-stack direction="inline" gap="small-100" alignItems="center">
+            <s-text type="small" tone="neutral">
+              {selectedIdx + 1} / {offers.length}
+            </s-text>
+            <s-button
+              variant="secondary"
+              onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
+              disabled={!canPrev || undefined}
+              accessibility-label="Previous breed"
+            >
+              <s-icon type="arrow-left" size="small" />
+            </s-button>
+            <s-button
+              variant="secondary"
+              onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
+              disabled={!canNext || undefined}
+              accessibility-label="Next breed"
+            >
+              <s-icon type="arrow-right" size="small" />
+            </s-button>
+          </s-stack>
+        </s-grid>
 
-      <s-divider />
+        <s-divider />
 
-      <s-grid gridTemplateColumns="auto 1fr auto" gap="base" alignItems="center">
-        {selected.imageUrl ? (
+        {/* STEP-B: s-product-thumbnail is Shopify's "cover + optional qty
+            badge" primitive; it ships its own placeholder when src is
+            null. Replaces the manual s-image + s-box fallback. */}
+        <s-grid
+          gridTemplateColumns="auto 1fr auto"
+          gap="base"
+          alignItems="center"
+        >
           <s-product-thumbnail
             src={selected.imageUrl}
             alt={selected.productTitle}
             size="base"
           />
-        ) : (
-          <s-box />
-        )}
-        <s-stack direction="block" gap="small-200">
-          <s-text type="strong">{selected.productTitle}</s-text>
-          <s-stack direction="inline" gap="small-100">
-            {compareAt && Number(compareAt) !== Number(discounted) && (
-              <s-text type="small" tone="neutral">{formatMoney(compareAt)}</s-text>
-            )}
-            <s-text type="strong">{formatMoney(discounted)}</s-text>
+          <s-stack direction="block" gap="small-200">
+            <s-text type="strong">{selected.productTitle}</s-text>
+            <s-stack direction="inline" gap="small-100">
+              {compareAt && Number(compareAt) !== Number(discounted) && (
+                <s-text type="small" tone="neutral">
+                  {formatMoney(compareAt)}
+                </s-text>
+              )}
+              <s-text type="strong">{formatMoney(discounted)}</s-text>
+            </s-stack>
           </s-stack>
+          <s-button
+            variant="primary"
+            onclick={add}
+            loading={submitting || undefined}
+            accessibility-label={`Add ${selected.productTitle}`}
+          >
+            ADD
+          </s-button>
+        </s-grid>
+
+        {error && (
+          <s-text type="small" tone="critical">
+            {error}
+          </s-text>
+        )}
+
+        <s-stack
+          direction="inline"
+          gap="small-100"
+          alignInline="center"
+          alignItems="center"
+        >
+          <s-icon type="lock" size="small" />
+          <s-text type="small" tone="neutral">
+            One click · ships together · no card details
+          </s-text>
         </s-stack>
-        <s-button
-          variant="primary"
-          onclick={add}
-          loading={submitting || undefined}
-          accessibility-label={`Add ${selected.productTitle}`}
-        >ADD</s-button>
-      </s-grid>
-
-      {error && <s-text type="small" tone="critical">{error}</s-text>}
-
-      <s-stack direction="inline" gap="small-100" alignInline="center" alignItems="center">
-        <s-icon type="lock" size="small" />
-        <s-text type="small" tone="neutral">
-          One click · ships together · no card details
-        </s-text>
       </s-stack>
-    </s-stack>
+    </s-banner>
   );
 }
 
+// STEP-B: s-banner replaces the old hex-background s-stack. tone="success"
+// matches the panel while in offer state.
 function AddedPanel({ breed }) {
   return (
-    <s-stack
-      direction="block"
-      gap="base"
-      padding="base"
-      border="base"
-      background={COLORS.accentTint}
-      alignInline="center"
-    >
-      <s-icon type="check-circle" size="large" />
-      <s-heading size="large-100">Added to your order</s-heading>
-      <s-text type="small" tone="neutral">
+    <s-banner tone="success" heading="Added to your order">
+      <s-paragraph>
         Your {breed} ships with your order — $0 extra shipping.
-      </s-text>
-    </s-stack>
+      </s-paragraph>
+    </s-banner>
   );
 }
 
