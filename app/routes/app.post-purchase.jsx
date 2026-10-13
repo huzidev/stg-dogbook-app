@@ -254,13 +254,25 @@ export const action = async ({ request }) => {
     }`,
     {
       variables: {
-        metafields: [{
-          ownerId: shopId,
-          namespace: METAFIELD_NAMESPACE,
-          key: METAFIELD_KEY,
-          type: "json",
-          value: JSON.stringify({ variantGids, discountPercent }),
-        }],
+        metafields: [
+          {
+            ownerId: shopId,
+            namespace: METAFIELD_NAMESPACE,
+            key: METAFIELD_KEY,
+            type: "json",
+            value: JSON.stringify({ variantGids, discountPercent }),
+          },
+          // Parallel copy as list.variant_reference so the order-confirmation
+          // email Liquid can resolve variant.product.title/image/price without
+          // hitting Admin API from the email template.
+          {
+            ownerId: shopId,
+            namespace: METAFIELD_NAMESPACE,
+            key: "email_upsell_variants",
+            type: "list.variant_reference",
+            value: JSON.stringify(variantGids),
+          },
+        ],
       },
     },
   );

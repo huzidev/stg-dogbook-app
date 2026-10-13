@@ -34,7 +34,10 @@ fn cart_lines_discounts_generate_run(
         .iter()
         .filter(|l| match l.attribute() {
             Some(a) => match a.value() {
-                Some(v) => matches!(v.as_str(), "checkout" | "cart" | "order-status"),
+                Some(v) => matches!(
+                    v.as_str(),
+                    "checkout" | "cart" | "order-status" | "order-confirmation"
+                ),
                 None => false,
             },
             None => false,

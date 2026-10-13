@@ -47,6 +47,7 @@ function Extension() {
   const [added, setAdded] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(OFFER_SECONDS);
   const tileRefs = useRef([]);
+  const scrollBoxRef = useRef(null);
 
   const myshopifyDomain = shopInfo?.myshopifyDomain;
   const purchasedLines = order?.lineItems ?? [];
@@ -88,11 +89,14 @@ function Extension() {
   }, []);
 
   useEffect(() => {
-    tileRefs.current[selectedIdx]?.scrollIntoView?.({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
-    });
+    const tile = tileRefs.current[selectedIdx];
+    const box = scrollBoxRef.current;
+    if (!tile || !box) return;
+    // ponytail: imperative scrollLeft because scrollIntoView doesn't cross
+    // the s-scroll-box shadow DOM in customer-account UI runtime.
+    const target =
+      tile.offsetLeft - (box.clientWidth - tile.clientWidth) / 2;
+    box.scrollTo?.({ left: target, behavior: "smooth" });
   }, [selectedIdx]);
 
   if (loading || !offers.length) return null;
@@ -151,7 +155,13 @@ function Extension() {
           <s-badge>$0 EXTRA SHIPPING</s-badge>
         </s-stack>
 
-        <s-scroll-box overflow="auto hidden">
+        <s-scroll-box
+          ref={(el) => {
+            scrollBoxRef.current = el;
+          }}
+          overflow="auto hidden"
+          inlineSize="fill"
+        >
           <s-grid
             gridTemplateColumns={`repeat(${offers.length}, ${TILE_WIDTH})`}
             gap="small-100"

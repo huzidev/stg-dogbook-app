@@ -1,0 +1,318 @@
+<!--
+  THE DOG BOOK — Order Confirmation Email (Lovable design port)
+  Design source: docs/post-purchase-design-lovable/src/routes/email.tsx
+  Paste into: Shopify Admin → Settings → Notifications → Order confirmation
+             (Edit code → replace the body)
+
+  How it works:
+    - Upsell variants come from the shop metafield
+      `app.email_upsell_variants` (list.variant_reference), written by
+      the app's admin page (`app/routes/app.post-purchase.jsx`). Edit
+      the offer there, not here.
+    - Every tile link + the "Add to my order" CTA is a Shopify cart
+      permalink: `/cart/{variantId}:1?attributes[_upsell_source]=order-confirmation`
+      That attribute is matched by the deployed Rust Discount Function
+      which applies the configured % off.
+    - No live countdown (email can't tick); shows the end-time instead.
+    - 4-tile cap (2x2 on mobile, 4-across on desktop). More than 4
+      upsell variants in the metafield are ignored.
+-->
+{%- assign upsell_variants = shop.metafields.app.email_upsell_variants.value -%}
+{%- assign offer_cfg = shop.metafields.app.post_purchase_offer | parse_json -%}
+{%- assign percent = offer_cfg.discountPercent | default: 20 -%}
+{%- assign percent_remainder = 100 | minus: percent -%}
+{%- assign offer_deadline = 'now' | date: '%s' | plus: 86400 | date: '%B %-d, %-l:%M %p' -%}
+
+<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>{{ shop.name }} — Order Confirmed</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
+  <style>
+    body, table, td { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; display: block; }
+    body { margin: 0; padding: 0; width: 100% !important; background-color: #F6F4EF; }
+    a { text-decoration: none; }
+    @media only screen and (max-width:600px) {
+      .container { width: 100% !important; }
+      .stack { display: block !important; width: 100% !important; }
+      .px-mobile { padding-left: 20px !important; padding-right: 20px !important; }
+      .py-mobile { padding-top: 20px !important; padding-bottom: 20px !important; }
+      .upsell-cta { width: 100% !important; display: block !important; }
+      .upsell-action { padding-top: 12px !important; }
+      .breed-cell { padding: 4px !important; width: 50% !important; }
+    }
+  </style>
+</head>
+
+<body style="margin:0; padding:0; background-color:#F6F4EF;">
+
+  <div style="display:none; max-height:0; overflow:hidden; font-size:1px; line-height:1px; color:#F6F4EF; opacity:0;">
+    Order {{ order_name }} confirmed — your Dog Book is on its way.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F4EF;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" class="container" width="576" cellpadding="0" cellspacing="0"
+               style="width:576px; max-width:576px; background-color:#FFFFFF;">
+
+          <!-- header: THE DOG BOOK wordmark -->
+          <tr>
+            <td align="center" style="padding:16px 40px; border-bottom:1px solid #DED9CF;">
+              <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; letter-spacing:3.5px; color:#1E1C18; font-weight:700; text-transform:uppercase;">
+                The Dog Book
+              </div>
+            </td>
+          </tr>
+
+          <!-- greeting + CONFIRMED pill -->
+          <tr>
+            <td class="px-mobile py-mobile" style="padding:24px 40px 0 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+                    <div style="font-size:18px; font-weight:700; color:#1E1C18; line-height:1.3;">
+                      Thanks, {{ customer.first_name | default: billing_address.first_name }} — your book is on its way.
+                    </div>
+                    <div style="font-size:12px; color:#7B766D; margin-top:6px;">
+                      Order {{ order_name }} &middot; {{ order.created_at | date: "%B %-d, %Y" }}
+                    </div>
+                  </td>
+                  <td valign="top" align="right" style="padding-left:12px; white-space:nowrap;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="background-color:#F0ECE2; padding:6px 10px;">
+                          <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:10px; letter-spacing:1.2px; color:#2F6E3E; font-weight:700; text-transform:uppercase;">
+                            &#10003;&nbsp; Confirmed
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- line items + totals -->
+          <tr>
+            <td class="px-mobile" style="padding:16px 40px 0 40px;">
+              {% for line in line_items %}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                     style="background-color:#F6F4EF; margin-bottom:8px;">
+                <tr>
+                  <td style="padding:12px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td width="56" valign="top" style="width:56px;">
+                          <img src="{{ line.image | image_url: width: 112 }}" width="56" height="44"
+                               alt="{{ line.title | escape }} cover"
+                               style="width:56px; height:44px; object-fit:cover; background-color:#4D543A;">
+                        </td>
+                        <td valign="middle" style="padding-left:12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+                          <div style="font-size:14px; font-weight:700; color:#1E1C18;">
+                            {{ line.title }} &middot; Qty {{ line.quantity }}
+                          </div>
+                          <div style="font-size:12px; color:#7B766D; margin-top:2px;">Your Dog Book</div>
+                        </td>
+                        <td valign="middle" align="right"
+                            style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; color:#1E1C18; white-space:nowrap;">
+                          {{ line.final_price | money }}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              {% endfor %}
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                     style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#1E1C18;">
+                <tr><td style="padding:6px 4px; color:#7B766D;">Subtotal</td>
+                    <td align="right" style="padding:6px 4px;">{{ subtotal_price | money }}</td></tr>
+                <tr><td style="padding:6px 4px; color:#7B766D;">Shipping</td>
+                    <td align="right" style="padding:6px 4px;">{{ shipping_price | money }}</td></tr>
+                {% if tax_price and tax_price > 0 %}
+                <tr><td style="padding:6px 4px; color:#7B766D;">Tax</td>
+                    <td align="right" style="padding:6px 4px;">{{ tax_price | money }}</td></tr>
+                {% endif %}
+                {% if total_discounts and total_discounts > 0 %}
+                <tr><td style="padding:6px 4px; color:#2F6E3E;">Discount</td>
+                    <td align="right" style="padding:6px 4px; color:#2F6E3E;">&minus;{{ total_discounts | money }}</td></tr>
+                {% endif %}
+                <tr><td colspan="2" style="padding:8px 0 0 0;"><div style="border-top:1px solid #DED9CF;"></div></td></tr>
+                <tr><td style="padding:8px 4px 0 4px; font-size:16px; font-weight:700;">Total</td>
+                    <td align="right" style="padding:8px 4px 0 4px; font-size:16px; font-weight:700;">{{ total_price | money }}</td></tr>
+              </table>
+
+              <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D; padding:12px 4px 0 4px; line-height:1.5;">
+                Ships to {{ shipping_address.name }}, {{ shipping_address.city }} &middot; arriving in 8&ndash;12 weeks, tracked.
+              </div>
+            </td>
+          </tr>
+
+          <!-- UPSELL PANEL -->
+          {%- if upsell_variants.size > 0 -%}
+          {%- assign featured = upsell_variants.first -%}
+          {%- assign featured_variant_num = featured.id | split: '/' | last -%}
+          {%- assign featured_original = featured.price -%}
+          {%- assign featured_discounted = featured.price | times: percent_remainder | divided_by: 100 -%}
+          {%- assign featured_cart_url = shop.url | append: '/cart/' | append: featured_variant_num | append: ':1?attributes[_upsell_source]=order-confirmation' -%}
+
+          <tr>
+            <td class="px-mobile" style="padding:20px 40px 0 40px;">
+              <table role="presentation" role="region" aria-label="Add a book offer" width="100%"
+                     cellpadding="0" cellspacing="0" style="border:1px solid #2F6E3E; background-color:#F2F7F3;">
+                <tr>
+                  <td style="padding:20px;">
+
+                    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:24px; font-weight:700; color:#1E1C18; line-height:1.2;">
+                      Add a book, save {{ percent }}% off your next order
+                    </div>
+
+                    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#7B766D; margin-top:8px;">
+                      Order by <strong style="color:#2F6E3E; font-weight:700;">{{ offer_deadline }}</strong> to get {{ percent }}% off.
+                    </div>
+
+                    <!-- badges -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+                      <tr>
+                        <td style="background-color:#2F6E3E; padding:4px 10px;">
+                          <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:10px; letter-spacing:1px; color:#FFFFFF; font-weight:700; text-transform:uppercase;">
+                            &minus;{{ percent }}%
+                          </span>
+                        </td>
+                        <td style="width:8px;">&nbsp;</td>
+                        <td style="border:1px solid #2F6E3E; padding:3px 10px;">
+                          <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:10px; letter-spacing:1px; color:#2F6E3E; font-weight:700; text-transform:uppercase;">
+                            $0 Extra Shipping
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- breed grid, up to 4 tiles -->
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                      <tr>
+                        {%- for variant in upsell_variants limit: 4 -%}
+                        {%- assign v_num = variant.id | split: '/' | last -%}
+                        {%- assign v_cart_url = shop.url | append: '/cart/' | append: v_num | append: ':1?attributes[_upsell_source]=order-confirmation' -%}
+                        <td class="stack breed-cell" valign="top" width="25%" style="width:25%; padding:4px;">
+                          <a href="{{ v_cart_url }}" style="color:#1E1C18;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                                   style="background-color:#FFFFFF; border:1px solid #DED9CF;">
+                              <tr>
+                                <td align="center" style="background-color:#F6F4EF; padding:12px;">
+                                  <img src="{{ variant.image | image_url: width: 200 }}" width="80" height="100"
+                                       alt="{{ variant.product.title | escape }} cover"
+                                       style="width:80px; height:100px; object-fit:cover;">
+                                </td>
+                              </tr>
+                              <tr>
+                                <td align="center"
+                                    style="padding:8px 6px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:11px; font-weight:600; color:#1E1C18; line-height:1.3; min-height:32px;">
+                                  {{ variant.product.title }}
+                                </td>
+                              </tr>
+                            </table>
+                          </a>
+                        </td>
+                        {%- endfor -%}
+                      </tr>
+                    </table>
+
+                    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D; margin-top:8px;">
+                      All breeds available &mdash; <a href="{{ shop.url }}/collections/all" style="color:#7B766D; text-decoration:underline;">see the full collection &rarr;</a>
+                    </div>
+
+                    <!-- action row: featured (first) variant -->
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                           class="upsell-action"
+                           style="margin-top:16px; border-top:1px solid #DED9CF; padding-top:16px;">
+                      <tr>
+                        <td class="stack" valign="middle" width="64" style="width:64px;">
+                          <img src="{{ featured.image | image_url: width: 160 }}" width="64" height="80"
+                               alt="{{ featured.product.title | escape }} cover"
+                               style="width:64px; height:80px; object-fit:cover;">
+                        </td>
+                        <td class="stack" valign="middle"
+                            style="padding:0 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+                          <div style="font-size:14px; font-weight:600; color:#1E1C18;">{{ featured.product.title }}</div>
+                          <div style="font-size:14px; margin-top:4px;">
+                            <s style="font-size:12px; color:#7B766D;">{{ featured_original | money }}</s>
+                            <strong style="font-size:16px; font-weight:700; color:#1E1C18; margin-left:6px;">{{ featured_discounted | money }}</strong>
+                          </div>
+                        </td>
+                        <td class="stack" valign="middle" align="right">
+                          <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td align="center" style="background-color:#1E1C18;">
+                                <a class="upsell-cta" href="{{ featured_cart_url }}"
+                                   style="display:inline-block; min-height:48px; padding:14px 16px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; color:#FFFFFF; letter-spacing:0.5px;">
+                                  Add to my order
+                                </a>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D; text-align:center; margin-top:12px;">
+                      &#128274;&nbsp; One click &middot; no card details
+                    </div>
+
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {%- endif -%}
+
+          <!-- track order link -->
+          <tr>
+            <td align="center" class="px-mobile" style="padding:20px 40px 8px 40px;">
+              <a href="{{ order_status_url }}"
+                 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px; font-weight:600; color:#1E1C18; text-decoration:underline; letter-spacing:0.5px;">
+                Track your order &rarr;
+              </a>
+            </td>
+          </tr>
+
+          <!-- footer -->
+          <tr>
+            <td align="center" class="px-mobile"
+                style="padding:24px 40px 32px 40px; border-top:1px solid #DED9CF; margin-top:24px;">
+              <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px; color:#7B766D; margin:16px 0 12px 0;">
+                Questions? <a href="mailto:{{ shop.email }}" style="color:#1E1C18; font-weight:700;">Reply to this email</a>
+              </div>
+              <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D;">
+                <a href="{{ shop.url }}/pages/faq" style="color:#7B766D;">FAQ</a>
+                &nbsp;&middot;&nbsp;
+                <a href="{{ shop.url }}/pages/return-policy" style="color:#7B766D;">Returns</a>
+                &nbsp;&middot;&nbsp;
+                <a href="{{ shop.url }}/pages/contact" style="color:#7B766D;">Contact</a>
+              </div>
+              <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:11px; color:#A8A8A8; margin-top:16px;">
+                &copy; {{ 'now' | date: '%Y' }} {{ shop.name }}
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
