@@ -127,45 +127,69 @@ function Extension() {
   const canPrev = selectedIdx > 0;
   const canNext = selectedIdx < offers.length - 1;
 
-  // STEP-B2: carousel scroll + grab-to-drag. scrollerRef = the s-scroll-box
-  // host; tileRefs[i] = each s-clickable. Arrow buttons call choose(i) which
-  // both updates selection AND scrolls the tile into view. The useEffect
-  // below wires mousedown/move/up on the scroller host so the whole strip
-  // can be dragged with the mouse (touch already works natively).
-  // Rollback: delete scrollerRef, tileRefs, the useEffect, and swap choose()
-  // back to plain setSelectedIdx() in the arrow onclicks.
+  // STEP-B4: s-scroll-box hides its real scroll container inside shadow DOM,
+  // so neither scrollIntoView nor scrollLeft on the host ref actually moves
+  // the strip. Walk the DOM up (crossing shadow boundaries via
+  // getRootNode().host) until we find the ancestor that has horizontal
+  // overflow — THAT'S the real scroller — and scroll it directly.
+  // Rollback: revert findScroller + choose + useEffect to the STEP-B2 block
+  // in the prior commit (plain scrollIntoView + host-scrollLeft drag).
   const scrollerRef = useRef(null);
   const tileRefs = useRef([]);
+
+  const findScroller = (fromEl) => {
+    let node = fromEl?.parentElement ?? fromEl?.getRootNode?.()?.host ?? null;
+    while (node) {
+      if (node.scrollWidth > node.clientWidth + 1) return node;
+      node = node.parentElement ?? node.getRootNode?.()?.host ?? null;
+    }
+    return null;
+  };
+
   const choose = (i) => {
     setSelectedIdx(i);
-    const el = tileRefs.current[i];
-    if (el?.scrollIntoView) {
-      el.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+    const tile = tileRefs.current[i];
+    const scroller = findScroller(tile);
+    if (!tile || !scroller) return;
+    const tileRect = tile.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const target =
+      scroller.scrollLeft + (tileRect.left - scrollerRect.left) - 8;
+    if (typeof scroller.scrollTo === "function") {
+      scroller.scrollTo({ left: target, behavior: "smooth" });
+    } else {
+      scroller.scrollLeft = target;
     }
   };
+
   useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return undefined;
+    const host = scrollerRef.current;
+    if (!host) return undefined;
     let down = false;
     let startX = 0;
     let startLeft = 0;
+    let scroller = null;
     const onDown = (e) => {
+      // Find the real scroller from the event target (walks shadow DOM).
+      scroller = findScroller(e.target) ?? findScroller(host.firstElementChild);
+      if (!scroller) return;
       down = true;
       startX = e.pageX;
-      startLeft = el.scrollLeft ?? 0;
+      startLeft = scroller.scrollLeft;
     };
     const onMove = (e) => {
-      if (!down) return;
-      el.scrollLeft = startLeft - (e.pageX - startX);
+      if (!down || !scroller) return;
+      scroller.scrollLeft = startLeft - (e.pageX - startX);
     };
     const onUp = () => {
       down = false;
+      scroller = null;
     };
-    el.addEventListener("mousedown", onDown);
+    host.addEventListener("mousedown", onDown);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
-      el.removeEventListener("mousedown", onDown);
+      host.removeEventListener("mousedown", onDown);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };

@@ -6,6 +6,7 @@ import {
   useExtensionInput,
   BlockStack,
   Button,
+  CalloutBanner,
   Heading,
   Image,
   InlineStack,
@@ -184,18 +185,19 @@ function OrderConfirmedRow({ orderName }) {
   );
 }
 
-// STEP-C: hex `background` values were being silently dropped by the
-// post-purchase lib (its View.background expects an appearance keyword, not
-// a hex). Switch to the keyword primitives so the banner actually paints a
-// tinted fill. Rollback: restore the `background={COLORS.*}` lines.
+// STEP-C2: wrap the offer in CalloutBanner — the one post-purchase
+// primitive that actually paints an accented tinted panel with a border.
+// `border="base"` on plain View was being silently dropped (same story as
+// hex backgrounds). Rollback: swap the <CalloutBanner> wrapper back for
+// the <View padding="base" border="base" cornerRadius="none"> from the
+// prior commit — behaviorally identical, visually plainer.
 function OfferBanner({ secondsLeft, discountPercent }) {
   return (
-    <View padding="base" border="base" cornerRadius="none">
+    <CalloutBanner
+      title={`Add a book, save ${discountPercent}% off your next order`}
+    >
       <InlineStack spacing="loose" blockAlignment="center">
         <BlockStack spacing="tight">
-          <Heading level={2}>
-            Add a book, save {discountPercent}% off your next order
-          </Heading>
           <InlineStack spacing="tight">
             {/* STEP-C: −20% pill. The library has no `strong` background
                 keyword that renders dark, so we fall back to a bordered
@@ -226,7 +228,7 @@ function OfferBanner({ secondsLeft, discountPercent }) {
           </Text>
         </BlockStack>
       </InlineStack>
-    </View>
+    </CalloutBanner>
   );
 }
 
