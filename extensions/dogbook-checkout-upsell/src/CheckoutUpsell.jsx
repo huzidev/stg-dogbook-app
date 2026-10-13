@@ -133,22 +133,18 @@ function Extension() {
   // useEffect from the prior commit and swap the s-grid below for an
   // s-scroll-box + single-row s-grid.
 
-  // STEP-B6: outer back to s-box (grey, no icon). s-banner's baked-in icon
-  // was eating a whole grid column on the left — the exact spacing the user
-  // asked to remove. Polaris has no primitive that paints green AND skips
-  // the icon, so grey wins. Rollback: swap this s-box for `s-banner
-  // tone="success"` with the heading prop and drop the inner s-heading.
+  // STEP-B7: user picked green over no-icon. s-banner tone="success" paints
+  // the mint panel + border but reserves ~32px on the left for its baked-in
+  // tone icon — this is a Polaris primitive constraint, not something we
+  // can override (`icon` prop doesn't exist on s-banner; border color only
+  // accepts 'base'). Rollback: swap this s-banner for the prior s-box
+  // background="subdued" + inner s-heading to drop the icon (and the green).
   return (
-    <s-box
-      padding="small-200"
-      border="base"
-      borderRadius="none"
-      background="subdued"
+    <s-banner
+      tone="success"
+      heading={`Add a book, save ${discountPercent}% off your next order`}
     >
       <s-stack direction="block" gap="small-100">
-        <s-heading size="base">
-          Add a book, save {discountPercent}% off your next order
-        </s-heading>
         {/* STEP-B: tone="success" pills (were tone-less grey before). */}
         <s-stack direction="inline" gap="small-100">
           <s-badge tone="success">−{discountPercent}%</s-badge>
@@ -268,26 +264,18 @@ function Extension() {
           </s-text>
         </s-stack>
       </s-stack>
-    </s-box>
+    </s-banner>
   );
 }
 
-// STEP-B6: AddedPanel also back to s-box subdued for the icon-free look.
+// STEP-B7: AddedPanel also back to green s-banner.
 function AddedPanel({ breed }) {
   return (
-    <s-box
-      padding="small-200"
-      border="base"
-      borderRadius="none"
-      background="subdued"
-    >
-      <s-stack direction="block" gap="small-100">
-        <s-heading size="base">Added to your order</s-heading>
-        <s-paragraph>
-          Your {breed} ships with your order — $0 extra shipping.
-        </s-paragraph>
-      </s-stack>
-    </s-box>
+    <s-banner tone="success" heading="Added to your order">
+      <s-paragraph>
+        Your {breed} ships with your order — $0 extra shipping.
+      </s-paragraph>
+    </s-banner>
   );
 }
 
