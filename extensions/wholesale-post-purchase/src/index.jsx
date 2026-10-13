@@ -216,7 +216,7 @@ function OfferBanner({ secondsLeft, discountPercent }) {
               {/* $0 EXTRA SHIPPING pill */}
               <View padding="extraTight" border="base" cornerRadius="none">
                 <Text size="small" emphasized appearance="success">
-                  $0 EXTRA SHIPPING
+                  $0 EXTRA SHIPPING hello world
                 </Text>
               </View>
             </InlineStack>

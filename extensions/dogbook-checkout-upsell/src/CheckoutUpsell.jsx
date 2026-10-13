@@ -122,6 +122,29 @@ function Extension() {
     }
   };
 
+  // STEP-B8: best-effort suppression of the s-banner tone-icon. Polaris
+  // doesn't expose an `icon` prop or a documented shadow part, so we try
+  // two hacks: a <style> tag with ::part(icon) + descendant selectors,
+  // and a useEffect that walks into any open shadow root and sets
+  // display:none on the icon node. Either may be silently blocked by the
+  // Shopify sandbox or a closed shadow root — in that case the icon
+  // stays and this hunk is a no-op. Rollback: delete the useEffect below
+  // AND the <style> tag inside the s-banner return.
+  useEffect(() => {
+    const kill = () => {
+      document.querySelectorAll("s-banner").forEach((b) => {
+        const root = b.shadowRoot;
+        if (!root) return;
+        const icon =
+          root.querySelector('[part~="icon"]') ?? root.querySelector("svg");
+        if (icon) icon.style.display = "none";
+      });
+    };
+    kill();
+    const id = setTimeout(kill, 50);
+    return () => clearTimeout(id);
+  });
+
   if (added) return <AddedPanel breed={selected.productTitle} />;
 
   // STEP-B6: carousel abandoned. s-scroll-box doesn't expose its real
@@ -144,11 +167,16 @@ function Extension() {
       tone="success"
       heading={`Add a book, save ${discountPercent}% off your next order`}
     >
+      {/* STEP-B8: CSS hack companion to the useEffect above. Attempts to
+          hide the tone-icon via a documented part name and a generic svg
+          fallback. If the sandbox strips <style> or the shadow doesn't
+          expose that part, this is a no-op. */}
+      <style>{`s-banner::part(icon){display:none !important}s-banner [part~="icon"]{display:none !important}`}</style>
       <s-stack direction="block" gap="small-100">
         {/* STEP-B: tone="success" pills (were tone-less grey before). */}
         <s-stack direction="inline" gap="small-100">
           <s-badge tone="success">−{discountPercent}%</s-badge>
-          <s-badge tone="success">$0 EXTRA SHIPPING</s-badge>
+          <s-badge tone="success">$0 EXTRA SHIPPING hello world</s-badge>
         </s-stack>
 
         {/* STEP-B6: wrapping s-grid. gridTemplateColumns uses
