@@ -2,71 +2,113 @@ import { useEffect, useState } from "react";
 import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
 import { authenticate } from "../shopify.server";
 
-const METAOBJECT_TYPE = "$app:post_purchase_offer";
-const DEFAULT_HANDLE = "default-offer";
+const METAFIELD_NAMESPACE = "app";
+const METAFIELD_KEY = "post_purchase_offer";
 const DEFAULT_DISCOUNT = 20;
+
+// ponytail: first-load migration. If the shop metafield is empty but the old
+// metaobject still exists, seed from it so the admin page shows the current
+// values. First Save writes the new shape and the metaobject can be deleted
+// manually from admin. Remove this fallback after the staging migration.
+const LEGACY_METAOBJECT_TYPE = "$app:post_purchase_offer";
+const LEGACY_METAOBJECT_HANDLE = "default-offer";
 
 const gidToNumeric = (gid) => (gid ? String(gid).split("/").pop() : null);
 
-export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+async function readMetafieldConfig(admin) {
+  const resp = await admin.graphql(`#graphql
+    query { shop { metafield(namespace: "${METAFIELD_NAMESPACE}", key: "${METAFIELD_KEY}") { value } } }
+  `);
+  const body = await resp.json();
+  const raw = body?.data?.shop?.metafield?.value;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const variantGids = Array.isArray(parsed?.variantGids)
+      ? parsed.variantGids.map(String).filter(Boolean)
+      : [];
+    const discountPercent = Number(parsed?.discountPercent) || DEFAULT_DISCOUNT;
+    if (!variantGids.length) return null;
+    return { variantGids, discountPercent };
+  } catch {
+    return null;
+  }
+}
 
-  // Look up the metaobject by handle; if missing, show an empty form.
+async function readLegacyMetaobject(admin) {
   const resp = await admin.graphql(
     `#graphql
-    query DefaultOffer($handle: MetaobjectHandleInput!) {
+    query Legacy($handle: MetaobjectHandleInput!) {
       metaobjectByHandle(handle: $handle) {
-        id
-        handle
         fields {
           key
           value
-          references(first: 50) {
-            nodes {
-              ... on ProductVariant {
-                id
-                title
-                price
-                image { url altText }
-                product { title featuredImage { url altText } }
-              }
-            }
-          }
+          references(first: 50) { nodes { ... on ProductVariant { id } } }
         }
       }
     }`,
-    { variables: { handle: { type: METAOBJECT_TYPE, handle: DEFAULT_HANDLE } } },
+    { variables: { handle: { type: LEGACY_METAOBJECT_TYPE, handle: LEGACY_METAOBJECT_HANDLE } } },
   );
   const body = await resp.json();
-  const node = body?.data?.metaobjectByHandle ?? null;
-
-  let variants = [];
-  let discountPercent = DEFAULT_DISCOUNT;
-  let metaobjectId = null;
-
-  if (node) {
-    metaobjectId = node.id;
-    const map = {};
-    for (const f of node.fields ?? []) map[f.key] = f;
-    const refs = map.variant_ids?.references?.nodes ?? [];
-    variants = refs
-      .filter((r) => r?.id)
-      .map((r) => ({
-        id: r.id,
-        numericId: gidToNumeric(r.id),
-        productTitle: r.product?.title ?? r.title ?? "",
-        variantTitle: r.title ?? "",
-        price: r.price ?? null,
-        imageUrl: r.image?.url ?? r.product?.featuredImage?.url ?? null,
-      }));
-    const dp = Number(map.discount_percent?.value);
-    if (Number.isFinite(dp) && dp > 0) discountPercent = dp;
-  }
-
+  const node = body?.data?.metaobjectByHandle;
+  if (!node) return null;
+  const map = {};
+  for (const f of node.fields ?? []) map[f.key] = f;
+  const variantGids = (map.variant_ids?.references?.nodes ?? [])
+    .map((r) => r?.id)
+    .filter(Boolean);
+  if (!variantGids.length) return null;
+  const dp = Number(map.discount_percent?.value);
   return {
-    metaobjectId,
+    variantGids,
+    discountPercent: Number.isFinite(dp) && dp > 0 ? dp : DEFAULT_DISCOUNT,
+  };
+}
+
+async function hydrateDisplay(admin, variantGids) {
+  if (!variantGids.length) return [];
+  const resp = await admin.graphql(
+    `#graphql
+    query HydrateDisplay($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on ProductVariant {
+          id
+          title
+          price
+          image { url altText }
+          product { title featuredImage { url altText } }
+        }
+      }
+    }`,
+    { variables: { ids: variantGids } },
+  );
+  const body = await resp.json();
+  return (body?.data?.nodes ?? [])
+    .filter((n) => n?.id)
+    .map((n) => ({
+      id: n.id,
+      numericId: gidToNumeric(n.id),
+      productTitle: n.product?.title ?? n.title ?? "",
+      variantTitle: n.title ?? "",
+      price: n.price ?? null,
+      imageUrl: n.image?.url ?? n.product?.featuredImage?.url ?? null,
+    }));
+}
+
+async function fetchShopId(admin) {
+  const resp = await admin.graphql(`#graphql query { shop { id } }`);
+  const body = await resp.json();
+  return body?.data?.shop?.id ?? null;
+}
+
+export const loader = async ({ request }) => {
+  const { admin, session } = await authenticate.admin(request);
+  const config =
+    (await readMetafieldConfig(admin)) ?? (await readLegacyMetaobject(admin));
+  const variants = config ? await hydrateDisplay(admin, config.variantGids) : [];
+  return {
     variants,
-    discountPercent,
+    discountPercent: config?.discountPercent ?? DEFAULT_DISCOUNT,
     shopDomain: session.shop,
   };
 };
@@ -75,7 +117,6 @@ export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const form = await request.formData();
 
-  // Variants come in as a repeated hidden input `variantGids`.
   const variantGids = form.getAll("variantGids").map((g) => String(g)).filter(Boolean);
   const discountPercent = Math.max(0, Math.min(100, Number(form.get("discountPercent")) || 0));
 
@@ -83,33 +124,32 @@ export const action = async ({ request }) => {
     return { ok: false, error: "Pick at least one variant." };
   }
 
+  const shopId = await fetchShopId(admin);
+  if (!shopId) return { ok: false, error: "Could not resolve shop id." };
+
   const resp = await admin.graphql(
     `#graphql
-    mutation UpsertOffer($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
-      metaobjectUpsert(handle: $handle, metaobject: $metaobject) {
-        metaobject { id handle }
+    mutation Save($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
         userErrors { field message code }
       }
     }`,
     {
       variables: {
-        handle: { type: METAOBJECT_TYPE, handle: DEFAULT_HANDLE },
-        metaobject: {
-          handle: DEFAULT_HANDLE,
-          fields: [
-            { key: "variant_ids", value: JSON.stringify(variantGids) },
-            { key: "discount_percent", value: String(discountPercent) },
-            { key: "enabled", value: "true" },
-            { key: "priority", value: "0" },
-          ],
-        },
+        metafields: [{
+          ownerId: shopId,
+          namespace: METAFIELD_NAMESPACE,
+          key: METAFIELD_KEY,
+          type: "json",
+          value: JSON.stringify({ variantGids, discountPercent }),
+        }],
       },
     },
   );
   const body = await resp.json();
-  const errors = body?.data?.metaobjectUpsert?.userErrors ?? [];
+  const errors = body?.data?.metafieldsSet?.userErrors ?? [];
   if (errors.length) {
-    console.error("[post-purchase/settings] upsert userErrors", errors);
+    console.error("[post-purchase/settings] userErrors", errors);
     return { ok: false, error: errors.map((e) => e.message).join("; ") };
   }
   return { ok: true };

@@ -132,7 +132,7 @@ function Extension() {
               >
                 <s-stack direction="block" gap="small-100" alignInline="center">
                   {o.imageUrl ? (
-                    <s-image source={o.imageUrl} alt={o.productTitle} />
+                    <s-image src={o.imageUrl} alt={o.productTitle} objectFit="cover" />
                   ) : (
                     <s-box
                       padding="small-100"
@@ -163,15 +163,17 @@ function Extension() {
             onclick={() => canPrev && setSelectedIdx(selectedIdx - 1)}
             disabled={!canPrev || undefined}
             accessibility-label="Previous breed"
-            icon="arrow-left"
-          />
+          >
+            <s-icon type="arrow-left" size="small" />
+          </s-button>
           <s-button
             variant="secondary"
             onclick={() => canNext && setSelectedIdx(selectedIdx + 1)}
             disabled={!canNext || undefined}
             accessibility-label="Next breed"
-            icon="arrow-right"
-          />
+          >
+            <s-icon type="arrow-right" size="small" />
+          </s-button>
         </s-stack>
       </s-grid>
 
