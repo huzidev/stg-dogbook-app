@@ -5,7 +5,7 @@
 
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import {
   UPSELL_SOURCE_KEY,
@@ -46,6 +46,7 @@ function Extension() {
   const [error, setError] = useState(null);
 
   const cartVariantGids = lines.map((l) => l.merchandise?.id).filter(Boolean);
+  const tileRefs = useRef([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,13 +77,13 @@ function Extension() {
     discountPercent,
   );
 
-  const add = async () => {
+  const addOffer = async (offer) => {
     setSubmitting(true);
     setError(null);
     try {
       const result = await shopify.applyCartLinesChange({
         type: "addCartLine",
-        merchandiseId: selected.variantGid,
+        merchandiseId: offer.variantGid,
         quantity: 1,
         attributes: [
           { key: UPSELL_SOURCE_KEY, value: UPSELL_SOURCE_CHECKOUT },
@@ -100,12 +101,24 @@ function Extension() {
     }
   };
 
+  const add = () => addOffer(selected);
+
+  const atFirst = selectedIdx === 0;
+  const atLast = selectedIdx === offers.length - 1;
+
+  useEffect(() => {
+    const el = tileRefs.current[selectedIdx];
+    el?.scrollIntoView?.({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selectedIdx]);
+
   const goPrev = () => {
-    setSelectedIdx((i) => (i === 0 ? offers.length - 1 : i - 1));
+    if (atFirst) return;
+    setSelectedIdx((i) => i - 1);
   };
 
   const goNext = () => {
-    setSelectedIdx((i) => (i === offers.length - 1 ? 0 : i + 1));
+    if (atLast) return;
+    setSelectedIdx((i) => i + 1);
   };
 
   if (added) {
@@ -155,58 +168,89 @@ function Extension() {
             {offers.map((o, i) => {
               const isSelected = i === selectedIdx;
               return (
-                <s-clickable
+                <s-box
                   key={o.variantGid}
-                  onclick={() => setSelectedIdx(i)}
-                  accessibility-label={o.productTitle}
+                  ref={(el) => {
+                    tileRefs.current[i] = el;
+                  }}
+                  padding="small-100"
+                  border="base"
+                  borderRadius="base"
+                  background={isSelected ? "subdued" : "base"}
                 >
-                  <s-box
-                    padding="small-100"
-                    border="base"
-                    borderRadius="base"
-                    background={isSelected ? "subdued" : "base"}
+                  <s-stack
+                    direction="block"
+                    gap="none"
+                    alignInline="center"
                   >
-                    <s-stack
-                      direction="block"
-                      gap="small-200"
-                      alignInline="center"
+                    <s-clickable
+                      onclick={() => setSelectedIdx(i)}
+                      accessibility-label={o.productTitle}
+                    >
+                      <s-stack
+                        direction="block"
+                        gap="small-200"
+                        alignInline="center"
+                      >
+                        <s-box
+                          inlineSize={COVER_WIDTH}
+                          blockSize={COVER_HEIGHT}
+                        >
+                          {o.imageUrl ? (
+                            <s-image
+                              src={o.imageUrl}
+                              alt={o.productTitle}
+                              inlineSize="fill"
+                              blockSize="fill"
+                              objectFit="cover"
+                            />
+                          ) : (
+                            <s-box
+                              inlineSize="fill"
+                              blockSize="fill"
+                              background="subdued"
+                            >
+                              <s-text type="small">
+                                {String(i + 1).padStart(2, "0")}
+                              </s-text>
+                            </s-box>
+                          )}
+                        </s-box>
+
+                        <s-box minBlockSize="28px">
+                          <s-text
+                            type="small"
+                            tone={isSelected ? "success" : undefined}
+                          >
+                            {o.productTitle}
+                          </s-text>
+                        </s-box>
+                      </s-stack>
+                    </s-clickable>
+
+                    <s-clickable
+                      onclick={() => addOffer(o)}
+                      accessibility-label={`Add ${o.productTitle}`}
                     >
                       <s-box
-                        inlineSize={COVER_WIDTH}
-                        blockSize={COVER_HEIGHT}
+                        padding="small-100"
+                        background="strong"
+                        borderRadius="base"
+                        inlineSize="fill"
                       >
-                        {o.imageUrl ? (
-                          <s-image
-                            src={o.imageUrl}
-                            alt={o.productTitle}
-                            inlineSize="fill"
-                            blockSize="fill"
-                            objectFit="cover"
-                          />
-                        ) : (
-                          <s-box
-                            inlineSize="fill"
-                            blockSize="fill"
-                            background="subdued"
-                          >
-                            <s-text type="small">
-                              {String(i + 1).padStart(2, "0")}
-                            </s-text>
-                          </s-box>
-                        )}
-                      </s-box>
-
-                      <s-box minBlockSize="36px">
-                        <s-text
-                          type="small"
-                          tone={isSelected ? "success" : undefined}
+                        <s-stack
+                          direction="inline"
+                          alignInline="center"
+                          alignItems="center"
                         >
-                          {o.productTitle}
-                        </s-text>
+                          <s-text type="strong" tone="inverse">
+                            + ADD
+                          </s-text>
+                        </s-stack>
                       </s-box>
-                    </s-stack>
-                  </s-box>
-                </s-clickable>
+                    </s-clickable>
+                  </s-stack>
+                </s-box>
               );
             })}
           </s-grid>
@@ -232,6 +276,7 @@ function Extension() {
               variant="secondary"
               size="small"
               onclick={goPrev}
+              disabled={atFirst || undefined}
               accessibility-label="Previous book"
             >
               ←
@@ -240,6 +285,7 @@ function Extension() {
               variant="secondary"
               size="small"
               onclick={goNext}
+              disabled={atLast || undefined}
               accessibility-label="Next book"
             >
               →

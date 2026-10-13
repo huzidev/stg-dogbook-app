@@ -82,15 +82,15 @@ export function App() {
 
   const selected = offers[selectedIdx];
 
-  const accept = async () => {
-    if (!selected) return;
+  const accept = async (offer = selected) => {
+    if (!offer) return;
     setSubmitting(true);
     setError(null);
     try {
       const changes = [
         {
           type: "add_variant",
-          variantId: Number(selected.variantId),
+          variantId: Number(offer.variantId),
           quantity: 1,
           discount: {
             value: discountPercent,
@@ -129,12 +129,11 @@ export function App() {
     <Layout maxInlineSize={900} inlineAlignment="center">
       <View padding="loose" border="base" cornerRadius="base">
         <BlockStack spacing="loose">
-          {/* Order confirmed */}
-          <View inlineAlignment="center">
+          <Layout inlineAlignment="center">
             <Text emphasized appearance="success">
               ✓ Order {orderName ?? ""} confirmed
             </Text>
-          </View>
+          </Layout>
 
           {/* Offer banner */}
           <OfferBanner
@@ -147,6 +146,8 @@ export function App() {
             offers={offers}
             selectedIdx={selectedIdx}
             onSelect={setSelectedIdx}
+            onAdd={accept}
+            submitting={submitting}
           />
 
           {/* Action row */}
@@ -161,11 +162,11 @@ export function App() {
 
           <TrustRow />
 
-          <View inlineAlignment="center">
+          <Layout inlineAlignment="center">
             <Button plain onPress={() => setState("declined")}>
               No thanks
             </Button>
-          </View>
+          </Layout>
         </BlockStack>
       </View>
     </Layout>
@@ -175,9 +176,8 @@ export function App() {
 function OfferBanner({ secondsLeft, discountPercent }) {
   return (
     <Banner status="success">
-      {/* Two-column layout: left content / right timer */}
-      <InlineStack spacing="base" blockAlignment="center">
-        <BlockStack spacing="tight">
+      <InlineStack spacing="xloose" align="space-between" blockAlignment="center">
+        <BlockStack spacing="xtight">
           <Heading level={2}>
             Add a book, save {discountPercent}% off your next order
           </Heading>
@@ -196,33 +196,36 @@ function OfferBanner({ secondsLeft, discountPercent }) {
           </InlineStack>
         </BlockStack>
 
-        {/* Large timer on the right */}
-        <BlockStack spacing="none" inlineAlignment="trailing">
-          <Text size="extraLarge" emphasized appearance="success">
-            {formatMMSS(secondsLeft)}
-          </Text>
-          <Text size="small" appearance="subdued">
-            OFFER ENDS IN
-          </Text>
-        </BlockStack>
+        <View inlineAlignment="trailing">
+          <BlockStack spacing="none" inlineAlignment="trailing">
+            <Text size="extraLarge" emphasized appearance="success">
+              {formatMMSS(secondsLeft)}
+            </Text>
+            <Text size="xlarge" appearance="subdued" emphasized>
+              OFFER ENDS IN
+            </Text>
+          </BlockStack>
+        </View>
       </InlineStack>
     </Banner>
   );
 }
 
-function BreedCarousel({ offers, selectedIdx, onSelect }) {
+function BreedCarousel({ offers, selectedIdx, onSelect, onAdd, submitting }) {
   const canPrev = selectedIdx > 0;
   const canNext = selectedIdx < offers.length - 1;
 
+  const perLine = Math.min(offers.length, 4);
+
   return (
     <BlockStack spacing="base">
-      <Tiles maxPerLine={5} spacing="base">
+      <Tiles maxPerLine={perLine} spacing="base">
         {offers.map((offer, i) => {
           const isSelected = i === selectedIdx;
           return (
             <View
               key={offer.variantId}
-              padding="tight"
+              padding={isSelected ? "base" : "tight"}
               border="base"
               cornerRadius="base"
               background={isSelected ? "subdued" : undefined}
@@ -242,26 +245,34 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
                     </Text>
                   </View>
                 )}
-                <Text size="small" emphasized>
+                <Text
+                  size="small"
+                  emphasized
+                  appearance={isSelected ? "success" : undefined}
+                >
+                  {isSelected ? "✓ " : ""}
                   {offer.productTitle}
                 </Text>
+                <Button
+                  submit
+                  onPress={() => onAdd(offer)}
+                  loading={submitting}
+                  accessibilityLabel={`Add ${offer.productTitle}`}
+                >
+                  ADD
+                </Button>
               </BlockStack>
             </View>
           );
         })}
       </Tiles>
 
-      {/* Navigation row – properly split left / right */}
-      <InlineStack spacing="base" blockAlignment="center">
-        <Text appearance="subdued" size="small">
-          Swipe →
-        </Text>
-
-        <View>
-          <InlineStack spacing="tight" blockAlignment="center">
-            <Text appearance="subdued" size="small" emphasized>
-              {selectedIdx + 1} / {offers.length}
-            </Text>
+      <Layout sizes={["fill", "auto"]} inlineAlignment="center">
+        <InlineStack spacing="base" blockAlignment="center">
+          <Text appearance="subdued" size="small" emphasized>
+            {selectedIdx + 1} / {offers.length}
+          </Text>
+          <View padding="extraTight" border="base" cornerRadius="base">
             <Button
               plain
               onPress={() => canPrev && onSelect(selectedIdx - 1)}
@@ -270,6 +281,8 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
             >
               ←
             </Button>
+          </View>
+          <View padding="extraTight" border="base" cornerRadius="base">
             <Button
               plain
               onPress={() => canNext && onSelect(selectedIdx + 1)}
@@ -278,9 +291,9 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
             >
               →
             </Button>
-          </InlineStack>
-        </View>
-      </InlineStack>
+          </View>
+        </InlineStack>
+      </Layout>
     </BlockStack>
   );
 }
@@ -295,18 +308,20 @@ function ActionRow({ offer, discountPercent, onAdd, submitting }) {
   return (
     <>
       <Separator />
-      <InlineStack spacing="base" blockAlignment="center">
-        {/* Thumbnail */}
-        {offer.imageUrl && (
-          <Image
-            source={offer.imageUrl}
-            description={offer.productTitle}
-            aspectRatio={0.75}
-            fit="cover"
-          />
+      <Layout sizes={["auto", "fill", "auto"]} inlineAlignment="center">
+        {offer.imageUrl ? (
+          <View maxInlineSize={64}>
+            <Image
+              source={offer.imageUrl}
+              description={offer.productTitle}
+              aspectRatio={0.75}
+              fit="cover"
+            />
+          </View>
+        ) : (
+          <View />
         )}
 
-        {/* Title + prices */}
         <BlockStack spacing="extraTight">
           <Text emphasized>{offer.productTitle}</Text>
           <InlineStack spacing="tight" blockAlignment="center">
@@ -321,7 +336,6 @@ function ActionRow({ offer, discountPercent, onAdd, submitting }) {
           </InlineStack>
         </BlockStack>
 
-        {/* ADD button */}
         <Button
           submit
           onPress={onAdd}
@@ -330,18 +344,18 @@ function ActionRow({ offer, discountPercent, onAdd, submitting }) {
         >
           ADD — {formatMoney(discounted)}
         </Button>
-      </InlineStack>
+      </Layout>
     </>
   );
 }
 
 function TrustRow() {
   return (
-    <View inlineAlignment="center">
+    <Layout inlineAlignment="center">
       <Text size="small" appearance="subdued">
         🔒 One click · ships together · no card details
       </Text>
-    </View>
+    </Layout>
   );
 }
 
