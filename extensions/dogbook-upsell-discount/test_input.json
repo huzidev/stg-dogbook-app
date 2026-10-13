@@ -1,0 +1,22 @@
+{
+  "cart": {
+    "lines": [
+      {
+        "id": "gid://shopify/CartLine/1",
+        "attribute": null
+      },
+      {
+        "id": "gid://shopify/CartLine/2",
+        "attribute": { "value": "checkout" }
+      },
+      {
+        "id": "gid://shopify/CartLine/3",
+        "attribute": { "value": "something-else" }
+      }
+    ]
+  },
+  "discount": {
+    "discountClasses": ["PRODUCT"],
+    "metafield": { "jsonValue": { "discountPercent": 20 } }
+  }
+}

@@ -1,0 +1,18 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "dogbook-upsell-discount"
+handle = "dogbook-upsell-discount"
+type = "function"
+uid = "c9104017-05f4-fd1b-e87c-d53f36342eb020739b58"
+description = "Applies the configured % off to any cart line added by the checkout upsell carousel (identified by the _upsell_source=checkout attribute)."
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart_lines_discounts_generate_run"
+
+  [extensions.build]
+  command = "cargo build --target=wasm32-unknown-unknown --release"
+  path = "target/wasm32-unknown-unknown/release/dogbook-upsell-discount.wasm"
+  watch = [ "src/**/*.rs" ]
