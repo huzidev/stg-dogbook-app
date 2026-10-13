@@ -17,10 +17,9 @@ import {
   View,
 } from "@shopify/post-purchase-ui-extensions-react";
 
-import {
-  COLORS,
-  POST_PURCHASE_OFFER_SECONDS,
-} from "../../_shared/tokens.js";
+// STEP-C: COLORS hex map removed from this file's imports — every
+// background that used it was being silently dropped by the lib.
+import { POST_PURCHASE_OFFER_SECONDS } from "../../_shared/tokens.js";
 import {
   fetchOffers,
   filterNotInCart,
@@ -132,23 +131,16 @@ export function App() {
   }
 
   if (state !== "browsing") {
-    return (
-      <TerminalPanel
-        state={state}
-        offer={selected}
-        onDone={done}
-        onReset={() => {
-          setSecondsLeft(POST_PURCHASE_OFFER_SECONDS);
-          setState("browsing");
-          setSubmitting(false);
-        }}
-      />
-    );
+    // STEP-C: dropped the `onReset` prop — the dev-only Back-to-offer
+    // button that consumed it is deleted inside TerminalPanel.
+    return <TerminalPanel state={state} offer={selected} onDone={done} />;
   }
 
   return (
     <Layout maxInlineSize={900} inlineAlignment="center">
-      <View padding="loose" background={COLORS.card} border="base">
+      {/* STEP-C: dropped `background={COLORS.card}` — hex was ignored.
+          Default surface bg + border carries the card look. */}
+      <View padding="loose" border="base">
         <BlockStack spacing="loose">
           <OrderConfirmedRow orderName={orderName} />
           <OfferBanner secondsLeft={secondsLeft} discountPercent={discountPercent} />
@@ -192,27 +184,25 @@ function OrderConfirmedRow({ orderName }) {
   );
 }
 
+// STEP-C: hex `background` values were being silently dropped by the
+// post-purchase lib (its View.background expects an appearance keyword, not
+// a hex). Switch to the keyword primitives so the banner actually paints a
+// tinted fill. Rollback: restore the `background={COLORS.*}` lines.
 function OfferBanner({ secondsLeft, discountPercent }) {
   return (
-    <View
-      padding="base"
-      border="base"
-      cornerRadius="none"
-      background={COLORS.accentTint}
-    >
+    <View padding="base" border="base" cornerRadius="none">
       <InlineStack spacing="loose" blockAlignment="center">
         <BlockStack spacing="tight">
           <Heading level={2}>
             Add a book, save {discountPercent}% off your next order
           </Heading>
           <InlineStack spacing="tight">
-            {/* −20% pill */}
-            <View
-              padding="extraTight"
-              background={COLORS.accent}
-              cornerRadius="none"
-            >
-              <Text size="small" emphasized appearance="monochrome">
+            {/* STEP-C: −20% pill. The library has no `strong` background
+                keyword that renders dark, so we fall back to a bordered
+                outline + success-tone text. Visually a mint outline pill
+                instead of a filled dark pill — closest the primitive allows. */}
+            <View padding="extraTight" border="base" cornerRadius="none">
+              <Text size="small" emphasized appearance="success">
                 −{discountPercent}%
               </Text>
             </View>
@@ -242,24 +232,27 @@ function OfferBanner({ secondsLeft, discountPercent }) {
 
 function BreedCarousel({ offers, selectedIdx, onSelect }) {
   // ponytail: no horizontal-scroll primitive; approximate the carousel with a
-  // Tiles grid that wraps. ← / → arrows work, swipe does not. Upgrade path:
-  // when the extension API exposes ScrollView, swap `Tiles` for a scroller.
+  // Tiles grid that wraps. With ≤5 variants it renders as a single row like
+  // the Lovable mock. Beyond 5, Tiles wraps to a second row — fine for the
+  // unlimited vertical space on post-purchase.
   const canPrev = selectedIdx > 0;
   const canNext = selectedIdx < offers.length - 1;
   return (
     <BlockStack spacing="tight">
       {/* ponytail: @shopify/post-purchase-ui-extensions-react 0.13.x doesn't
           export Pressable, so tiles are non-interactive. Selection is driven
-          entirely by the ← / → buttons below. Upgrade path: when the package
-          ships Pressable (or an onPress on View), wrap each tile in it. */}
+          entirely by the ← / → buttons below. */}
       <Tiles maxPerLine={5} spacing="tight">
         {offers.map((offer, i) => (
+          // STEP-C: hex `background` values dropped by the lib → keyword only.
+          // Selected tile uses `background="subdued"` for a subtle fill tint;
+          // non-selected omits background so the theme default (card) shows.
           <View
             key={offer.variantId}
             padding="tight"
             border="base"
             cornerRadius="none"
-            background={i === selectedIdx ? COLORS.accentTint : COLORS.card}
+            background={i === selectedIdx ? "subdued" : undefined}
           >
             <BlockStack spacing="tight" inlineAlignment="center">
               {offer.imageUrl ? (
@@ -270,9 +263,10 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
                   fit="cover"
                 />
               ) : (
+                // STEP-C: placeholder bg hex → keyword.
                 <View
                   padding="loose"
-                  background={COLORS.secondary}
+                  background="subdued"
                   cornerRadius="none"
                 >
                   <Text size="small" emphasized>
@@ -287,10 +281,10 @@ function BreedCarousel({ offers, selectedIdx, onSelect }) {
           </View>
         ))}
       </Tiles>
+      {/* STEP-C: dropped the "Swipe →" label — nothing scrolls on this
+          surface (library has no scroll primitive), so the hint was lying.
+          Arrows remain as the only navigation. */}
       <InlineStack spacing="base" blockAlignment="center">
-        <Text appearance="subdued" size="small">
-          Swipe →
-        </Text>
         <Text appearance="subdued" size="small" emphasized>
           {selectedIdx + 1} / {offers.length}
         </Text>
@@ -366,7 +360,10 @@ function TrustRow() {
   );
 }
 
-function TerminalPanel({ state, offer, onDone, onReset }) {
+// STEP-C: `onReset` prop removed from the call site — only the dev-only
+// "Back to the offer" button used it. Signature kept backward-compatible
+// for an easy restore.
+function TerminalPanel({ state, offer, onDone }) {
   const headline =
     state === "accepted"
       ? "Added to your order"
@@ -394,12 +391,10 @@ function TerminalPanel({ state, offer, onDone, onReset }) {
           <Button submit onPress={onDone}>
             Continue to confirmation
           </Button>
-          {/* ponytail: dev-only reset — remove before shipping to prod. */}
-          {state !== "accepted" && (
-            <Button plain onPress={onReset}>
-              Back to the offer
-            </Button>
-          )}
+          {/* STEP-C: deleted the dev-only "Back to the offer" ghost button
+              per the plan's prod checklist. Rollback: paste back the
+              `state !== "accepted" && <Button plain onPress={onReset}>…</Button>`
+              block and re-add `onReset` to the TerminalPanel signature. */}
         </BlockStack>
       </View>
     </Layout>
