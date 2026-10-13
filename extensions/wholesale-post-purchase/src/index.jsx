@@ -4,6 +4,7 @@ import {
   extend,
   render,
   useExtensionInput,
+  Banner,
   BlockStack,
   Button,
   CalloutBanner,
@@ -185,50 +186,55 @@ function OrderConfirmedRow({ orderName }) {
   );
 }
 
-// STEP-C2: wrap the offer in CalloutBanner — the one post-purchase
-// primitive that actually paints an accented tinted panel with a border.
-// `border="base"` on plain View was being silently dropped (same story as
-// hex backgrounds). Rollback: swap the <CalloutBanner> wrapper back for
-// the <View padding="base" border="base" cornerRadius="none"> from the
-// prior commit — behaviorally identical, visually plainer.
+// STEP-C4: swap CalloutBanner for Banner status="success". CalloutBanner
+// paints a grey/tinted panel with a built-in heading slot; Banner with
+// status="success" is Shopify's green "success" banner primitive — the
+// closest the lib comes to Lovable's mint fill. Trade: Banner is less
+// configurable (shows a built-in checkmark icon), but it's the only
+// post-purchase primitive that renders a GREEN panel.
+// Rollback: swap <Banner status="success"> back to <CalloutBanner title=…>
+// and move the headline back into the title prop.
 function OfferBanner({ secondsLeft, discountPercent }) {
   return (
-    <CalloutBanner
-      title={`Add a book, save ${discountPercent}% off your next order`}
-    >
-      <InlineStack spacing="loose" blockAlignment="center">
-        <BlockStack spacing="tight">
-          <InlineStack spacing="tight">
-            {/* STEP-C: −20% pill. The library has no `strong` background
-                keyword that renders dark, so we fall back to a bordered
-                outline + success-tone text. Visually a mint outline pill
-                instead of a filled dark pill — closest the primitive allows. */}
-            <View padding="extraTight" border="base" cornerRadius="none">
-              <Text size="small" emphasized appearance="success">
-                −{discountPercent}%
-              </Text>
-            </View>
-            {/* $0 EXTRA SHIPPING pill */}
-            <View padding="extraTight" border="base" cornerRadius="none">
-              <Text size="small" emphasized appearance="success">
-                $0 EXTRA SHIPPING
-              </Text>
-            </View>
-          </InlineStack>
-        </BlockStack>
-        <BlockStack spacing="none" inlineAlignment="trailing">
-          {/* ponytail: tabular-nums + monospace is automatic in post-purchase
-              typography. extraLarge ≈ 24-30px, not the 60px desktop target,
-              but it's the biggest size the primitive exposes. */}
-          <Text size="extraLarge" emphasized appearance="success">
-            {formatMMSS(secondsLeft)}
-          </Text>
-          <Text size="small" appearance="subdued">
-            OFFER ENDS IN
-          </Text>
-        </BlockStack>
-      </InlineStack>
-    </CalloutBanner>
+    <Banner status="success">
+      <BlockStack spacing="tight">
+        <Heading level={2}>
+          Add a book, save {discountPercent}% off your next order
+        </Heading>
+        <InlineStack spacing="loose" blockAlignment="center">
+          <BlockStack spacing="tight">
+            <InlineStack spacing="tight">
+              {/* STEP-C: −20% pill. The library has no `strong` background
+                  keyword that renders dark, so we fall back to a bordered
+                  outline + success-tone text. Visually a mint outline pill
+                  instead of a filled dark pill — closest the primitive allows. */}
+              <View padding="extraTight" border="base" cornerRadius="none">
+                <Text size="small" emphasized appearance="success">
+                  −{discountPercent}%
+                </Text>
+              </View>
+              {/* $0 EXTRA SHIPPING pill */}
+              <View padding="extraTight" border="base" cornerRadius="none">
+                <Text size="small" emphasized appearance="success">
+                  $0 EXTRA SHIPPING
+                </Text>
+              </View>
+            </InlineStack>
+          </BlockStack>
+          <BlockStack spacing="none" inlineAlignment="trailing">
+            {/* ponytail: tabular-nums + monospace is automatic in post-purchase
+                typography. extraLarge ≈ 24-30px, not the 60px desktop target,
+                but it's the biggest size the primitive exposes. */}
+            <Text size="extraLarge" emphasized appearance="success">
+              {formatMMSS(secondsLeft)}
+            </Text>
+            <Text size="small" appearance="subdued">
+              OFFER ENDS IN
+            </Text>
+          </BlockStack>
+        </InlineStack>
+      </BlockStack>
+    </Banner>
   );
 }
 

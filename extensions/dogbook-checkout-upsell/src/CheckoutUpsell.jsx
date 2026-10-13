@@ -27,7 +27,7 @@
 
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 
 import {
   UPSELL_SOURCE_KEY,
@@ -124,115 +124,51 @@ function Extension() {
 
   if (added) return <AddedPanel breed={selected.productTitle} />;
 
-  const canPrev = selectedIdx > 0;
-  const canNext = selectedIdx < offers.length - 1;
+  // STEP-B6: carousel abandoned. s-scroll-box doesn't expose its real
+  // scroller (shadow DOM), native s-clickable children don't bubble enough
+  // info to walk the tree, and plain divs are stripped by the sandbox.
+  // Switched to a wrapping s-grid instead — tiles wrap into 2-3 columns
+  // depending on viewport width. All ref/drag/scrollIntoView machinery is
+  // deleted. Rollback: restore scrollerRef/tileRefs/findScroller/choose +
+  // useEffect from the prior commit and swap the s-grid below for an
+  // s-scroll-box + single-row s-grid.
 
-  // STEP-B4: s-scroll-box hides its real scroll container inside shadow DOM,
-  // so neither scrollIntoView nor scrollLeft on the host ref actually moves
-  // the strip. Walk the DOM up (crossing shadow boundaries via
-  // getRootNode().host) until we find the ancestor that has horizontal
-  // overflow — THAT'S the real scroller — and scroll it directly.
-  // Rollback: revert findScroller + choose + useEffect to the STEP-B2 block
-  // in the prior commit (plain scrollIntoView + host-scrollLeft drag).
-  const scrollerRef = useRef(null);
-  const tileRefs = useRef([]);
-
-  const findScroller = (fromEl) => {
-    let node = fromEl?.parentElement ?? fromEl?.getRootNode?.()?.host ?? null;
-    while (node) {
-      if (node.scrollWidth > node.clientWidth + 1) return node;
-      node = node.parentElement ?? node.getRootNode?.()?.host ?? null;
-    }
-    return null;
-  };
-
-  const choose = (i) => {
-    setSelectedIdx(i);
-    const tile = tileRefs.current[i];
-    const scroller = findScroller(tile);
-    if (!tile || !scroller) return;
-    const tileRect = tile.getBoundingClientRect();
-    const scrollerRect = scroller.getBoundingClientRect();
-    const target =
-      scroller.scrollLeft + (tileRect.left - scrollerRect.left) - 8;
-    if (typeof scroller.scrollTo === "function") {
-      scroller.scrollTo({ left: target, behavior: "smooth" });
-    } else {
-      scroller.scrollLeft = target;
-    }
-  };
-
-  useEffect(() => {
-    const host = scrollerRef.current;
-    if (!host) return undefined;
-    let down = false;
-    let startX = 0;
-    let startLeft = 0;
-    let scroller = null;
-    const onDown = (e) => {
-      // Find the real scroller from the event target (walks shadow DOM).
-      scroller = findScroller(e.target) ?? findScroller(host.firstElementChild);
-      if (!scroller) return;
-      down = true;
-      startX = e.pageX;
-      startLeft = scroller.scrollLeft;
-    };
-    const onMove = (e) => {
-      if (!down || !scroller) return;
-      scroller.scrollLeft = startLeft - (e.pageX - startX);
-    };
-    const onUp = () => {
-      down = false;
-      scroller = null;
-    };
-    host.addEventListener("mousedown", onDown);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      host.removeEventListener("mousedown", onDown);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [offers.length]);
-
-  // STEP-B5: back to green via `s-banner tone="success"` — the only Polaris
-  // primitive that paints a true mint-green panel with a matching border.
-  // Trade: the banner reserves ~32px on the left for its baked-in success
-  // icon. There is no primitive that gives us "green panel with no icon
-  // padding"; `s-box background="success"` is not a valid Polaris value
-  // and blanked the extension when tried.
-  // Rollback: swap this `s-banner` for the prior `s-box background="subdued"`
-  // + inner `s-heading` block to drop the icon (and the green).
+  // STEP-B6: outer back to s-box (grey, no icon). s-banner's baked-in icon
+  // was eating a whole grid column on the left — the exact spacing the user
+  // asked to remove. Polaris has no primitive that paints green AND skips
+  // the icon, so grey wins. Rollback: swap this s-box for `s-banner
+  // tone="success"` with the heading prop and drop the inner s-heading.
   return (
-    <s-banner
-      tone="success"
-      heading={`Add a book, save ${discountPercent}% off your next order`}
+    <s-box
+      padding="small-200"
+      border="base"
+      borderRadius="none"
+      background="subdued"
     >
       <s-stack direction="block" gap="small-100">
+        <s-heading size="base">
+          Add a book, save {discountPercent}% off your next order
+        </s-heading>
         {/* STEP-B: tone="success" pills (were tone-less grey before). */}
         <s-stack direction="inline" gap="small-100">
           <s-badge tone="success">−{discountPercent}%</s-badge>
           <s-badge tone="success">$0 EXTRA SHIPPING</s-badge>
         </s-stack>
 
-        {/* STEP-B3-ROLLBACK: plain-div scroll strip blanked the extension
-            (sandbox likely strips arbitrary HTML + inline style). Back to
-            s-scroll-box + s-grid, which renders. The ref sits on each
-            s-clickable; scrollIntoView may or may not reach the sandboxed
-            scroller — if it does, arrow buttons scroll; if not, they only
-            change selection and the user has to swipe/trackpad the strip. */}
-        <s-scroll-box ref={scrollerRef} overflow="auto hidden">
-          <s-grid
-            gridTemplateColumns={offers.map(() => TILE_WIDTH).join(" ")}
-            gap="small-100"
-          >
-            {offers.map((o, i) => (
-              <s-clickable
-                key={o.variantGid}
-                ref={(el) => (tileRefs.current[i] = el)}
-                onclick={() => choose(i)}
-                accessibility-label={o.productTitle}
-              >
+        {/* STEP-B6: wrapping s-grid. gridTemplateColumns uses
+            `repeat(auto-fill, minmax(118px, 1fr))` so tiles wrap into 2-3
+            columns depending on the rail width — scales fine for any
+            number of products. No scroll primitive involved. */}
+        <s-grid
+          gridTemplateColumns="repeat(auto-fill, minmax(118px, 1fr))"
+          gap="small-100"
+        >
+          {offers.map((o, i) => (
+            <s-clickable
+              key={o.variantGid}
+              onclick={() => setSelectedIdx(i)}
+              accessibility-label={o.productTitle}
+            >
                 <s-box
                   padding="small-100"
                   border="base"
@@ -270,41 +206,13 @@ function Extension() {
                     </s-box>
                   </s-stack>
                 </s-box>
-              </s-clickable>
-            ))}
-          </s-grid>
-        </s-scroll-box>
-
-        {/* Swipe label + counter + arrows. Arrows only change which tile is
-            selected below — s-scroll-box has no programmatic scrollTo, so
-            we can't auto-chase the selection. Native touch/trackpad swipe
-            is the only way to actually move the strip. */}
-        <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
-          <s-text type="small" tone="neutral">
-            Swipe →
-          </s-text>
-          <s-stack direction="inline" gap="small-100" alignItems="center">
-            <s-text type="small" tone="neutral">
-              {selectedIdx + 1} / {offers.length}
-            </s-text>
-            <s-button
-              variant="secondary"
-              onclick={() => canPrev && choose(selectedIdx - 1)}
-              disabled={!canPrev || undefined}
-              accessibility-label="Previous breed"
-            >
-              <s-icon type="arrow-left" size="small" />
-            </s-button>
-            <s-button
-              variant="secondary"
-              onclick={() => canNext && choose(selectedIdx + 1)}
-              disabled={!canNext || undefined}
-              accessibility-label="Next breed"
-            >
-              <s-icon type="arrow-right" size="small" />
-            </s-button>
-          </s-stack>
+            </s-clickable>
+          ))}
         </s-grid>
+
+        {/* STEP-B6: counter + Swipe hint + arrow buttons removed. The grid
+            wraps so there's no "page" concept; a tap on any tile is the
+            new navigation. */}
 
         <s-divider />
 
@@ -360,18 +268,26 @@ function Extension() {
           </s-text>
         </s-stack>
       </s-stack>
-    </s-banner>
+    </s-box>
   );
 }
 
-// STEP-B5: AddedPanel also back to s-banner tone="success" for the mint fill.
+// STEP-B6: AddedPanel also back to s-box subdued for the icon-free look.
 function AddedPanel({ breed }) {
   return (
-    <s-banner tone="success" heading="Added to your order">
-      <s-paragraph>
-        Your {breed} ships with your order — $0 extra shipping.
-      </s-paragraph>
-    </s-banner>
+    <s-box
+      padding="small-200"
+      border="base"
+      borderRadius="none"
+      background="subdued"
+    >
+      <s-stack direction="block" gap="small-100">
+        <s-heading size="base">Added to your order</s-heading>
+        <s-paragraph>
+          Your {breed} ships with your order — $0 extra shipping.
+        </s-paragraph>
+      </s-stack>
+    </s-box>
   );
 }
 
