@@ -114,24 +114,6 @@ async function fetchShopId(admin) {
   return body?.data?.shop?.id ?? null;
 }
 
-// STEP-D: find the installed Function's shopifyFunctionId. Shopify assigns
-// one per app function install; we need it to create the automatic discount.
-async function findFunctionId(admin) {
-  const resp = await admin.graphql(`#graphql
-    query ListFunctions {
-      shopifyFunctions(first: 50) {
-        nodes { id apiType app { title } title }
-      }
-    }
-  `);
-  const body = await resp.json();
-  const nodes = body?.data?.shopifyFunctions?.nodes ?? [];
-  const match = nodes.find(
-    (n) => n?.apiType === "discounts" && n?.title === FUNCTION_HANDLE,
-  );
-  return match?.id ?? null;
-}
-
 // STEP-D: find an existing automatic app discount for our function by title.
 // We can't query by function id directly, so we match on the title we set at
 // create time. Idempotent — safe to call on every save.
@@ -157,7 +139,7 @@ async function findExistingDiscountId(admin) {
   return match?.id ?? null;
 }
 
-async function createDiscount(admin, functionId, discountPercent) {
+async function createDiscount(admin, discountPercent) {
   const resp = await admin.graphql(
     `#graphql
     mutation CreateUpsellDiscount($discount: DiscountAutomaticAppInput!) {
@@ -170,7 +152,7 @@ async function createDiscount(admin, functionId, discountPercent) {
       variables: {
         discount: {
           title: FUNCTION_DISCOUNT_TITLE,
-          functionId,
+          functionHandle: FUNCTION_HANDLE,
           startsAt: new Date().toISOString(),
           discountClasses: ["PRODUCT"],
           metafields: [{
@@ -228,14 +210,7 @@ async function syncFunctionDiscount(admin, discountPercent) {
   try {
     let discountId = await findExistingDiscountId(admin);
     if (!discountId) {
-      const functionId = await findFunctionId(admin);
-      if (!functionId) {
-        console.warn(
-          "[post-purchase/settings] function not installed yet; skipping discount activation",
-        );
-        return;
-      }
-      discountId = await createDiscount(admin, functionId, discountPercent);
+      discountId = await createDiscount(admin, discountPercent);
       if (!discountId) return;
     }
     await updateDiscountMetafield(admin, discountId, discountPercent);
