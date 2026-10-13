@@ -96,7 +96,9 @@ async function hydrateDisplay(admin, variantGids) {
 }
 
 async function fetchShopId(admin) {
-  const resp = await admin.graphql(`#graphql query { shop { id } }`);
+  const resp = await admin.graphql(`#graphql
+    query { shop { id } }
+  `);
   const body = await resp.json();
   return body?.data?.shop?.id ?? null;
 }
