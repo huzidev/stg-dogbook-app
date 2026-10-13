@@ -6,6 +6,17 @@ const METAFIELD_NAMESPACE = "app";
 const METAFIELD_KEY = "post_purchase_offer";
 const DEFAULT_DISCOUNT = 20;
 
+// STEP-D: Shopify Function discount activation. On first admin-page save we
+// find-or-create the automatic app discount that points at our function, then
+// on every save we also write the current `discountPercent` to the discount's
+// own metafield (namespace `$app`, key `function-configuration`). The
+// function reads that metafield each run, so the percent flows from admin
+// edits straight through to real checkout totals with no redeploy.
+const FUNCTION_HANDLE = "dogbook-upsell-discount";
+const FUNCTION_DISCOUNT_TITLE = "Dog Book upsell";
+const FUNCTION_METAFIELD_NAMESPACE = "$app";
+const FUNCTION_METAFIELD_KEY = "function-configuration";
+
 // ponytail: first-load migration. If the shop metafield is empty but the old
 // metaobject still exists, seed from it so the admin page shows the current
 // values. First Save writes the new shape and the metaobject can be deleted
@@ -17,7 +28,7 @@ const gidToNumeric = (gid) => (gid ? String(gid).split("/").pop() : null);
 
 async function readMetafieldConfig(admin) {
   const resp = await admin.graphql(`#graphql
-    query { shop { metafield(namespace: "${METAFIELD_NAMESPACE}", key: "${METAFIELD_KEY}") { value } } }
+    query ReadUpsellConfig { shop { metafield(namespace: "app", key: "post_purchase_offer") { value } } }
   `);
   const body = await resp.json();
   const raw = body?.data?.shop?.metafield?.value;
@@ -97,10 +108,140 @@ async function hydrateDisplay(admin, variantGids) {
 
 async function fetchShopId(admin) {
   const resp = await admin.graphql(`#graphql
-    query { shop { id } }
+    query FetchShopId { shop { id } }
   `);
   const body = await resp.json();
   return body?.data?.shop?.id ?? null;
+}
+
+// STEP-D: find the installed Function's shopifyFunctionId. Shopify assigns
+// one per app function install; we need it to create the automatic discount.
+async function findFunctionId(admin) {
+  const resp = await admin.graphql(`#graphql
+    query ListFunctions {
+      shopifyFunctions(first: 50) {
+        nodes { id apiType app { title } title }
+      }
+    }
+  `);
+  const body = await resp.json();
+  const nodes = body?.data?.shopifyFunctions?.nodes ?? [];
+  const match = nodes.find(
+    (n) => n?.apiType === "discounts" && n?.title === FUNCTION_HANDLE,
+  );
+  return match?.id ?? null;
+}
+
+// STEP-D: find an existing automatic app discount for our function by title.
+// We can't query by function id directly, so we match on the title we set at
+// create time. Idempotent — safe to call on every save.
+async function findExistingDiscountId(admin) {
+  const resp = await admin.graphql(`#graphql
+    query ListDiscounts {
+      automaticDiscountNodes(first: 50, query: "status:ACTIVE") {
+        nodes {
+          id
+          automaticDiscount {
+            __typename
+            ... on DiscountAutomaticApp { title }
+          }
+        }
+      }
+    }
+  `);
+  const body = await resp.json();
+  const nodes = body?.data?.automaticDiscountNodes?.nodes ?? [];
+  const match = nodes.find(
+    (n) => n?.automaticDiscount?.title === FUNCTION_DISCOUNT_TITLE,
+  );
+  return match?.id ?? null;
+}
+
+async function createDiscount(admin, functionId, discountPercent) {
+  const resp = await admin.graphql(
+    `#graphql
+    mutation CreateUpsellDiscount($discount: DiscountAutomaticAppInput!) {
+      discountAutomaticAppCreate(automaticAppDiscount: $discount) {
+        automaticAppDiscount { discountId }
+        userErrors { field message }
+      }
+    }`,
+    {
+      variables: {
+        discount: {
+          title: FUNCTION_DISCOUNT_TITLE,
+          functionId,
+          startsAt: new Date().toISOString(),
+          discountClasses: ["PRODUCT"],
+          metafields: [{
+            namespace: FUNCTION_METAFIELD_NAMESPACE,
+            key: FUNCTION_METAFIELD_KEY,
+            type: "json",
+            value: JSON.stringify({ discountPercent }),
+          }],
+        },
+      },
+    },
+  );
+  const body = await resp.json();
+  const errors = body?.data?.discountAutomaticAppCreate?.userErrors ?? [];
+  if (errors.length) {
+    console.error("[post-purchase/settings] discount create userErrors", errors);
+    return null;
+  }
+  return body?.data?.discountAutomaticAppCreate?.automaticAppDiscount?.discountId ?? null;
+}
+
+async function updateDiscountMetafield(admin, discountId, discountPercent) {
+  // discountId is a gid like gid://shopify/DiscountAutomaticNode/... — the
+  // metafieldsSet mutation accepts it as `ownerId`.
+  const resp = await admin.graphql(
+    `#graphql
+    mutation SetFnConfig($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        userErrors { field message }
+      }
+    }`,
+    {
+      variables: {
+        metafields: [{
+          ownerId: discountId,
+          namespace: FUNCTION_METAFIELD_NAMESPACE,
+          key: FUNCTION_METAFIELD_KEY,
+          type: "json",
+          value: JSON.stringify({ discountPercent }),
+        }],
+      },
+    },
+  );
+  const body = await resp.json();
+  const errors = body?.data?.metafieldsSet?.userErrors ?? [];
+  if (errors.length) {
+    console.error("[post-purchase/settings] fn metafield userErrors", errors);
+  }
+}
+
+// STEP-D: idempotent "ensure the discount exists and reflects current %".
+// Safe to call on every save; a no-op after the first create except for the
+// metafield update.
+async function syncFunctionDiscount(admin, discountPercent) {
+  try {
+    let discountId = await findExistingDiscountId(admin);
+    if (!discountId) {
+      const functionId = await findFunctionId(admin);
+      if (!functionId) {
+        console.warn(
+          "[post-purchase/settings] function not installed yet; skipping discount activation",
+        );
+        return;
+      }
+      discountId = await createDiscount(admin, functionId, discountPercent);
+      if (!discountId) return;
+    }
+    await updateDiscountMetafield(admin, discountId, discountPercent);
+  } catch (err) {
+    console.error("[post-purchase/settings] syncFunctionDiscount failed", err);
+  }
 }
 
 export const loader = async ({ request }) => {
@@ -154,6 +295,14 @@ export const action = async ({ request }) => {
     console.error("[post-purchase/settings] userErrors", errors);
     return { ok: false, error: errors.map((e) => e.message).join("; ") };
   }
+
+  // STEP-D: keep the Function's discount config in lock-step with the shop
+  // metafield. Idempotent — creates the discount on first save, updates its
+  // metafield on every subsequent save. Non-fatal: if it fails, the shop
+  // metafield save still succeeds and the UI pill still shows the %, we just
+  // won't apply the discount at checkout until the next successful sync.
+  await syncFunctionDiscount(admin, discountPercent);
+
   return { ok: true };
 };
 

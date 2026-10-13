@@ -19,7 +19,7 @@ name = "stg-dogbook-app"
 
 [access_scopes]
 # No new scopes required for post-purchase extensions.
-scopes = "write_products,read_orders"
+scopes = "write_products,write_discounts,read_orders"
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
