@@ -171,18 +171,17 @@ function Extension() {
     };
   }, [offers.length]);
 
-  // STEP-B2: s-banner → s-box. s-banner reserves ~32px on the left for a
-  // baked-in success icon that eats the narrow rail on mobile. s-box lets
-  // us control padding but drops the green mint accent — the panel is now
-  // a subdued grey with a bordered edge. If the green matters more than
-  // the padding, revert this `s-box` back to the `s-banner tone="success"`
-  // from the previous commit and remove the inner s-heading.
+  // STEP-B3: back to green via `background="success"` on s-box — this is the
+  // mint fill without the s-banner's baked-in icon that was eating the left
+  // margin. If Shopify ignores `background="success"` on s-box and the panel
+  // renders transparent, swap it back to `background="subdued"` for a grey
+  // fallback.
   return (
     <s-box
       padding="small-200"
       border="base"
       borderRadius="none"
-      background="subdued"
+      background="success"
     >
       <s-stack direction="block" gap="small-100">
         <s-heading size="base">
@@ -194,20 +193,33 @@ function Extension() {
           <s-badge tone="success">$0 EXTRA SHIPPING</s-badge>
         </s-stack>
 
-        {/* STEP-B: horizontal-scroll carousel.
-            s-scroll-box with overflow="auto hidden" = scroll inline only.
-            s-grid with N explicit TILE_WIDTH columns = forces single row.
-            Pre-Step-B wrapped because s-stack direction="inline" wraps by
-            default. */}
-        <s-scroll-box ref={scrollerRef} overflow="auto hidden">
-          <s-grid
-            gridTemplateColumns={offers.map(() => TILE_WIDTH).join(" ")}
-            gap="small-100"
-          >
-            {offers.map((o, i) => (
+        {/* STEP-B3: horizontal carousel, plain-div edition.
+            s-scroll-box kept its scrollable element inside shadow DOM, so
+            scrollLeft/scrollIntoView/mouse-drag couldn't reach it. A plain
+            <div> with inline overflow styles gives full native scroll
+            control + works for any number of tiles. Each tile is wrapped
+            in a plain div for the ref so scrollIntoView finds a real DOM
+            node. Rollback: restore s-scroll-box + s-grid from the prior
+            commit; the drag/scroll handlers above become no-ops. */}
+        <div
+          ref={scrollerRef}
+          style={{
+            display: "flex",
+            gap: "8px",
+            overflowX: "auto",
+            overflowY: "hidden",
+            cursor: "grab",
+            paddingBottom: "4px",
+            touchAction: "pan-x",
+          }}
+        >
+          {offers.map((o, i) => (
+            <div
+              key={o.variantGid}
+              ref={(el) => (tileRefs.current[i] = el)}
+              style={{ flex: `0 0 ${TILE_WIDTH}` }}
+            >
               <s-clickable
-                key={o.variantGid}
-                ref={(el) => (tileRefs.current[i] = el)}
                 onclick={() => choose(i)}
                 accessibility-label={o.productTitle}
               >
@@ -245,9 +257,9 @@ function Extension() {
                   </s-stack>
                 </s-box>
               </s-clickable>
-            ))}
-          </s-grid>
-        </s-scroll-box>
+            </div>
+          ))}
+        </div>
 
         {/* Swipe label + counter + arrows. Arrows only change which tile is
             selected below — s-scroll-box has no programmatic scrollTo, so
@@ -338,15 +350,15 @@ function Extension() {
   );
 }
 
-// STEP-B2: AddedPanel also moves from s-banner → s-box for the same
-// icon/padding reason. Revert hunk alongside the main-panel revert.
+// STEP-B3: AddedPanel also uses background="success" for the green mint
+// fill. Trade/rollback same as the main panel.
 function AddedPanel({ breed }) {
   return (
     <s-box
       padding="small-200"
       border="base"
       borderRadius="none"
-      background="subdued"
+      background="success"
     >
       <s-stack direction="block" gap="small-100">
         <s-heading size="base">Added to your order</s-heading>
