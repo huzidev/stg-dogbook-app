@@ -1,0 +1,100 @@
+.dbk-upsell { font: inherit; color: #1e1c18; }
+.dbk-upsell[hidden] { display: none; }
+
+.dbk-upsell-card {
+  background: #f0ece2;
+  padding: 16px;
+  margin-top: 24px;
+}
+.dbk-upsell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dbk-upsell-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.dbk-upsell-chip {
+  background: #2f6e3e;
+  color: #fbf9f2;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.dbk-upsell-sub {
+  font-size: 14px;
+  color: #7b766d;
+  margin: 8px 0 0;
+}
+.dbk-upsell-sub s { color: rgba(123, 118, 109, 0.7); }
+.dbk-upsell-sub strong { margin-left: 4px; color: #1e1c18; }
+
+.dbk-upsell-list-wrap { position: relative; margin-top: 16px; }
+.dbk-upsell-list {
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+}
+.dbk-upsell-list-fade {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 48px;
+  background: linear-gradient(to top, #f0ece2, rgba(240, 236, 226, 0.8), transparent);
+  pointer-events: none;
+}
+.dbk-upsell-list-wrap[data-at-end] .dbk-upsell-list-fade { display: none; }
+
+.dbk-upsell-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #ded9cf;
+  padding: 12px;
+}
+.dbk-upsell-row-thumb {
+  width: 48px;
+  height: 64px;
+  flex: 0 0 48px;
+  background: #f6f4ef;
+  object-fit: cover;
+  display: block;
+}
+.dbk-upsell-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dbk-upsell-row-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ded9cf;
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+.dbk-upsell-row-btn[disabled] { opacity: 0.6; cursor: wait; }
+.dbk-upsell-row-btn[data-added] { background: #f0ece2; }
+.dbk-upsell-row-btn svg { width: 16px; height: 16px; }

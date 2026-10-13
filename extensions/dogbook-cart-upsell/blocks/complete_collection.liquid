@@ -1,0 +1,25 @@
+{% comment %}
+  Complete your collection — cart upsell block.
+  Design: docs/post-purchase-design-lovable/src/routes/panier.tsx
+  Data source: same /api/offers endpoint the checkout + post-purchase
+  extensions use. Attribute _upsell_source=cart lets the Rust Discount
+  Function discount the added line.
+{% endcomment %}
+
+<div
+  class="dbk-upsell"
+  data-dbk-upsell
+  data-app-url="https://stg-dogbook-app.vercel.app"
+  data-shop-domain="{{ shop.permanent_domain }}"
+></div>
+
+{{ 'complete-collection.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'complete-collection.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Complete your collection",
+  "target": "section",
+  "settings": []
+}
+{% endschema %}

@@ -1,18 +1,11 @@
 {
   "cart": {
     "lines": [
-      {
-        "id": "gid://shopify/CartLine/1",
-        "attribute": null
-      },
-      {
-        "id": "gid://shopify/CartLine/2",
-        "attribute": { "value": "checkout" }
-      },
-      {
-        "id": "gid://shopify/CartLine/3",
-        "attribute": { "value": "something-else" }
-      }
+      { "id": "gid://shopify/CartLine/1", "attribute": null },
+      { "id": "gid://shopify/CartLine/2", "attribute": { "value": "checkout" } },
+      { "id": "gid://shopify/CartLine/3", "attribute": { "value": "cart" } },
+      { "id": "gid://shopify/CartLine/4", "attribute": { "value": "order-status" } },
+      { "id": "gid://shopify/CartLine/5", "attribute": { "value": "something-else" } }
     ]
   },
   "discount": {
