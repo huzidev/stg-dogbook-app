@@ -114,27 +114,66 @@ async function fetchShopId(admin) {
   return body?.data?.shop?.id ?? null;
 }
 
+async function ensureDefinition(admin, definition) {
+  const resp = await admin.graphql(
+    `#graphql
+    mutation EnsureDef($definition: MetafieldDefinitionInput!) {
+      metafieldDefinitionCreate(definition: $definition) {
+        userErrors { code }
+      }
+    }`,
+    { variables: { definition } },
+  );
+  const errors = (await resp.json())?.data?.metafieldDefinitionCreate?.userErrors ?? [];
+  const fatal = errors.filter((e) => e.code !== "TAKEN");
+  if (fatal.length) console.error("[post-purchase/settings] definition errors", definition.key, fatal);
+}
+
+// Notification email Liquid can only read shop metafields that have a
+// definition. Without this, `shop.metafields.app.email_upsell_snapshot`
+// returns null in the order-confirmation email even though the value is set.
+async function ensureEmailUpsellDefinitions(admin) {
+  await ensureDefinition(admin, {
+    namespace: METAFIELD_NAMESPACE,
+    key: "email_upsell_variants",
+    name: "Email upsell variants",
+    type: "list.variant_reference",
+    ownerType: "SHOP",
+  });
+  await ensureDefinition(admin, {
+    namespace: METAFIELD_NAMESPACE,
+    key: "email_upsell_snapshot",
+    name: "Email upsell snapshot",
+    type: "json",
+    ownerType: "SHOP",
+  });
+}
+
 // STEP-D: find an existing automatic app discount for our function by title.
 // We can't query by function id directly, so we match on the title we set at
 // create time. Idempotent — safe to call on every save.
 async function findExistingDiscountId(admin) {
-  const resp = await admin.graphql(`#graphql
-    query ListDiscounts {
-      automaticDiscountNodes(first: 50, query: "status:ACTIVE") {
+  const resp = await admin.graphql(
+    `#graphql
+    query FindDiscount($q: String!) {
+      discountNodes(first: 5, query: $q) {
         nodes {
           id
-          automaticDiscount {
+          discount {
             __typename
             ... on DiscountAutomaticApp { title }
           }
         }
       }
-    }
-  `);
+    }`,
+    { variables: { q: `title:"${FUNCTION_DISCOUNT_TITLE}"` } },
+  );
   const body = await resp.json();
-  const nodes = body?.data?.automaticDiscountNodes?.nodes ?? [];
+  const nodes = body?.data?.discountNodes?.nodes ?? [];
   const match = nodes.find(
-    (n) => n?.automaticDiscount?.title === FUNCTION_DISCOUNT_TITLE,
+    (n) =>
+      n?.discount?.__typename === "DiscountAutomaticApp" &&
+      n?.discount?.title === FUNCTION_DISCOUNT_TITLE,
   );
   return match?.id ?? null;
 }
@@ -245,38 +284,65 @@ export const action = async ({ request }) => {
   const shopId = await fetchShopId(admin);
   if (!shopId) return { ok: false, error: "Could not resolve shop id." };
 
+  // ponytail: idempotent — Shopify returns a "taken" userError on repeat
+  // calls, which we ignore. Removes the manual "Add definition" admin step.
+  await ensureEmailUpsellDefinitions(admin);
+
+  // Notification email Liquid does not resolve list.variant_reference
+  // metafields even with Storefront API access enabled. So we hydrate
+  // variant data server-side here and store a JSON snapshot the email
+  // reads directly — no references, no late-binding.
+  const hydrated = await hydrateDisplay(admin, variantGids);
+  const emailSnapshot = hydrated.map((v) => ({
+    variantId: v.numericId,
+    productTitle: v.productTitle,
+    imageUrl: v.imageUrl,
+    price: v.price,
+  }));
+
+  const metafieldsPayload = [
+    {
+      ownerId: shopId,
+      namespace: METAFIELD_NAMESPACE,
+      key: METAFIELD_KEY,
+      type: "json",
+      value: JSON.stringify({ variantGids, discountPercent }),
+    },
+    {
+      ownerId: shopId,
+      namespace: METAFIELD_NAMESPACE,
+      key: "email_upsell_variants",
+      type: "list.variant_reference",
+      value: JSON.stringify(variantGids),
+    },
+    {
+      ownerId: shopId,
+      namespace: METAFIELD_NAMESPACE,
+      key: "email_upsell_snapshot",
+      type: "json",
+      value: JSON.stringify(emailSnapshot),
+    },
+  ];
+  console.log(
+    "[post-purchase/settings] metafieldsSet payload",
+    JSON.stringify(metafieldsPayload, null, 2),
+  );
+
   const resp = await admin.graphql(
     `#graphql
     mutation Save($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) {
+        metafields { id namespace key type value }
         userErrors { field message code }
       }
     }`,
-    {
-      variables: {
-        metafields: [
-          {
-            ownerId: shopId,
-            namespace: METAFIELD_NAMESPACE,
-            key: METAFIELD_KEY,
-            type: "json",
-            value: JSON.stringify({ variantGids, discountPercent }),
-          },
-          // Parallel copy as list.variant_reference so the order-confirmation
-          // email Liquid can resolve variant.product.title/image/price without
-          // hitting Admin API from the email template.
-          {
-            ownerId: shopId,
-            namespace: METAFIELD_NAMESPACE,
-            key: "email_upsell_variants",
-            type: "list.variant_reference",
-            value: JSON.stringify(variantGids),
-          },
-        ],
-      },
-    },
+    { variables: { metafields: metafieldsPayload } },
   );
   const body = await resp.json();
+  console.log(
+    "[post-purchase/settings] metafieldsSet response",
+    JSON.stringify(body?.data?.metafieldsSet, null, 2),
+  );
   const errors = body?.data?.metafieldsSet?.userErrors ?? [];
   if (errors.length) {
     console.error("[post-purchase/settings] userErrors", errors);

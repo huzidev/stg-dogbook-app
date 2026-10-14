@@ -28,20 +28,28 @@ fn cart_lines_discounts_generate_run(
         return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
     }
 
+    // Source is a cart-level attribute, set by the cart permalink
+    // `/cart/{id}:1?attributes[_upsell_source]=...`. All lines in a cart
+    // built from that permalink are the upsell, so target them all when
+    // the attribute matches.
+    let source_matches = match input.cart().attribute() {
+        Some(a) => match a.value() {
+            Some(v) => matches!(
+                v.as_str(),
+                "checkout" | "cart" | "order-status" | "order-confirmation"
+            ),
+            None => false,
+        },
+        None => false,
+    };
+    if !source_matches {
+        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
+    }
+
     let targets: Vec<schema::ProductDiscountCandidateTarget> = input
         .cart()
         .lines()
         .iter()
-        .filter(|l| match l.attribute() {
-            Some(a) => match a.value() {
-                Some(v) => matches!(
-                    v.as_str(),
-                    "checkout" | "cart" | "order-status" | "order-confirmation"
-                ),
-                None => false,
-            },
-            None => false,
-        })
         .map(|l| {
             schema::ProductDiscountCandidateTarget::CartLine(schema::CartLineTarget {
                 id: l.id().clone(),

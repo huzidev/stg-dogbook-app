@@ -1,10 +1,10 @@
 query Input {
   cart {
+    attribute(key: "_upsell_source") {
+      value
+    }
     lines {
       id
-      attribute(key: "_upsell_source") {
-        value
-      }
     }
   }
   discount {
