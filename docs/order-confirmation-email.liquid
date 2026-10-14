@@ -118,10 +118,10 @@
                   <td style="padding:12px;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td width="56" valign="top" style="width:56px;">
-                          <img src="{{ line.image | image_url: width: 112 }}" width="56" height="44"
+                        <td width="44" valign="top" style="width:44px;">
+                          <img src="{{ line.image | image_url: width: 112 }}" width="44" height="56"
                                alt="{{ line.title | escape }} cover"
-                               style="width:56px; height:44px; object-fit:cover; background-color:#4D543A;">
+                               style="width:44px; height:56px; object-fit:cover; background-color:#4D543A;">
                         </td>
                         <td valign="middle" style="padding-left:12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
                           <div style="font-size:14px; font-weight:700; color:#1E1C18;">
@@ -142,12 +142,12 @@
 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                      style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#1E1C18;">
-                <tr><td style="padding:6px 4px; color:#7B766D;">Subtotal</td>
+                <tr><td style="padding:6px 4px;">Subtotal</td>
                     <td align="right" style="padding:6px 4px;">{{ subtotal_price | money }}</td></tr>
-                <tr><td style="padding:6px 4px; color:#7B766D;">Shipping</td>
+                <tr><td style="padding:6px 4px;">Shipping</td>
                     <td align="right" style="padding:6px 4px;">{{ shipping_price | money }}</td></tr>
                 {% if tax_price and tax_price > 0 %}
-                <tr><td style="padding:6px 4px; color:#7B766D;">Tax</td>
+                <tr><td style="padding:6px 4px;">Tax</td>
                     <td align="right" style="padding:6px 4px;">{{ tax_price | money }}</td></tr>
                 {% endif %}
                 {% if total_discounts and total_discounts > 0 %}
@@ -184,7 +184,7 @@
                     </div>
 
                     <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#7B766D; margin-top:8px;">
-                      Order by <strong style="color:#2F6E3E; font-weight:700;">{{ offer_deadline }}</strong> to get {{ percent }}% off.
+                      Order by <strong style="font-size:16px; color:#2F6E3E; font-weight:700;">{{ offer_deadline }}</strong> to get {{ percent }}% off.
                     </div>
 
                     <!-- badges -->
@@ -221,13 +221,13 @@
                         {%- assign tile_bg = '#FFFFFF' -%}
                       {%- endif -%}
                       <a href="{{ v_cart_url }}"
-                         style="display:inline-block; vertical-align:top; width:126px; margin-right:8px; color:#1E1C18; background-color:{{ tile_bg }}; border:1px solid {{ tile_border }}; white-space:normal;">
-                        <div style="background-color:#F6F4EF; padding:12px; text-align:center;">
-                          <img src="{{ variant.imageUrl }}" width="80" height="100"
+                         style="display:inline-block; vertical-align:top; width:126px; margin-right:8px; padding:8px; box-sizing:border-box; color:#1E1C18; background-color:{{ tile_bg }}; border:1px solid {{ tile_border }}; white-space:normal;">
+                        <div style="background-color:#F6F4EF; height:80px; line-height:80px; text-align:center;">
+                          <img src="{{ variant.imageUrl }}" width="54" height="72"
                                alt="{{ variant.productTitle | escape }} cover"
-                               style="width:80px; height:100px; object-fit:cover; display:inline-block;">
+                               style="width:54px; height:72px; object-fit:cover; display:inline-block; vertical-align:middle;">
                         </div>
-                        <div style="padding:8px 10px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:11px; font-weight:600; color:#1E1C18; line-height:1.3; min-height:32px;">
+                        <div style="padding:8px 2px 2px 2px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:11px; font-weight:600; color:#1E1C18; line-height:1.3; min-height:32px;">
                           {{ variant.productTitle }}
                         </div>
                       </a>
@@ -236,16 +236,15 @@
                       </td></tr>
                     </table>
 
-                    <!-- counter row: "all breeds — scroll" + static "1 / N" + decorative arrows -->
+                    <!-- counter row: "all breeds — scroll" + "1 / N" counter + decorative prev/next arrows
+                         (arrows are inert <span> — email can't track selection, so they're ornamental) -->
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
                       <tr>
                         <td valign="middle" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D;">
                           All breeds available &mdash; scroll to see more &rarr;
                         </td>
-                        <td valign="middle" align="right" style="white-space:nowrap; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D;">
-                          <span style="font-weight:600;">1 / {{ upsell_variants.size }}</span>
-                          <span style="display:inline-block; border:1px solid #DED9CF; padding:4px 8px; margin-left:6px; color:#7B766D;">&larr;</span>
-                          <span style="display:inline-block; border:1px solid #DED9CF; padding:4px 8px; margin-left:4px; color:#1E1C18;">&rarr;</span>
+                        <td valign="middle" align="right" style="white-space:nowrap; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D; font-weight:600;">
+                          1 / {{ upsell_variants.size }}
                         </td>
                       </tr>
                     </table>
@@ -257,10 +256,10 @@
                            class="upsell-action"
                            style="width:100%; table-layout:fixed; margin-top:16px; border-top:1px solid #DED9CF; padding-top:16px;">
                       <tr>
-                        <td class="stack" valign="middle" width="64" style="width:64px;">
-                          <img src="{{ featured.imageUrl }}" width="64" height="80"
+                        <td class="stack" valign="middle" width="48" style="width:48px;">
+                          <img src="{{ featured.imageUrl }}" width="48" height="64"
                                alt="{{ featured.productTitle | escape }} cover"
-                               style="width:64px; height:80px; object-fit:cover;">
+                               style="width:48px; height:64px; object-fit:cover;">
                         </td>
                         <td class="stack" valign="middle"
                             style="padding:0 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; overflow:hidden;">
@@ -272,7 +271,7 @@
                         </td>
                         <td class="stack" valign="middle" align="right" width="150" style="width:150px;">
                           <a class="upsell-cta" href="{{ featured_cart_url }}"
-                             style="display:block; background-color:#1E1C18; padding:14px 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; color:#FFFFFF; letter-spacing:0.5px; text-align:center;">
+                             style="display:block; background-color:#1E1C18; padding:14px 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; color:#FFFFFF; text-align:center;">
                             Add to my order
                           </a>
                         </td>

@@ -5,6 +5,12 @@ query Input {
     }
     lines {
       id
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+        }
+      }
     }
   }
   discount {

@@ -178,7 +178,7 @@ async function findExistingDiscountId(admin) {
   return match?.id ?? null;
 }
 
-async function createDiscount(admin, discountPercent) {
+async function createDiscount(admin, config) {
   const resp = await admin.graphql(
     `#graphql
     mutation CreateUpsellDiscount($discount: DiscountAutomaticAppInput!) {
@@ -198,7 +198,7 @@ async function createDiscount(admin, discountPercent) {
             namespace: FUNCTION_METAFIELD_NAMESPACE,
             key: FUNCTION_METAFIELD_KEY,
             type: "json",
-            value: JSON.stringify({ discountPercent }),
+            value: JSON.stringify(config),
           }],
         },
       },
@@ -213,7 +213,7 @@ async function createDiscount(admin, discountPercent) {
   return body?.data?.discountAutomaticAppCreate?.automaticAppDiscount?.discountId ?? null;
 }
 
-async function updateDiscountMetafield(admin, discountId, discountPercent) {
+async function updateDiscountMetafield(admin, discountId, config) {
   // discountId is a gid like gid://shopify/DiscountAutomaticNode/... — the
   // metafieldsSet mutation accepts it as `ownerId`.
   const resp = await admin.graphql(
@@ -230,7 +230,7 @@ async function updateDiscountMetafield(admin, discountId, discountPercent) {
           namespace: FUNCTION_METAFIELD_NAMESPACE,
           key: FUNCTION_METAFIELD_KEY,
           type: "json",
-          value: JSON.stringify({ discountPercent }),
+          value: JSON.stringify(config),
         }],
       },
     },
@@ -242,17 +242,18 @@ async function updateDiscountMetafield(admin, discountId, discountPercent) {
   }
 }
 
-// STEP-D: idempotent "ensure the discount exists and reflects current %".
-// Safe to call on every save; a no-op after the first create except for the
-// metafield update.
-async function syncFunctionDiscount(admin, discountPercent) {
+// STEP-D: idempotent "ensure the discount exists and reflects current config".
+// Config = { discountPercent, variantIds }. The function needs variantIds to
+// restrict the discount to upsell variants only (otherwise normal products
+// added to the same cart would inherit the % off).
+async function syncFunctionDiscount(admin, config) {
   try {
     let discountId = await findExistingDiscountId(admin);
     if (!discountId) {
-      discountId = await createDiscount(admin, discountPercent);
+      discountId = await createDiscount(admin, config);
       if (!discountId) return;
     }
-    await updateDiscountMetafield(admin, discountId, discountPercent);
+    await updateDiscountMetafield(admin, discountId, config);
   } catch (err) {
     console.error("[post-purchase/settings] syncFunctionDiscount failed", err);
   }
@@ -354,7 +355,7 @@ export const action = async ({ request }) => {
   // metafield on every subsequent save. Non-fatal: if it fails, the shop
   // metafield save still succeeds and the UI pill still shows the %, we just
   // won't apply the discount at checkout until the next successful sync.
-  await syncFunctionDiscount(admin, discountPercent);
+  await syncFunctionDiscount(admin, { discountPercent, variantIds: variantGids });
 
   return { ok: true };
 };

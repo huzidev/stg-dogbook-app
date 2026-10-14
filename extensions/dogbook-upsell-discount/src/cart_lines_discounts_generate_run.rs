@@ -6,6 +6,8 @@ use shopify_function::Result;
 #[shopify_function(rename_all = "camelCase")]
 pub struct Configuration {
     discount_percent: f64,
+    #[shopify_function(default)]
+    variant_ids: Vec<String>,
 }
 
 #[shopify_function]
@@ -28,10 +30,11 @@ fn cart_lines_discounts_generate_run(
         return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
     }
 
-    // Source is a cart-level attribute, set by the cart permalink
-    // `/cart/{id}:1?attributes[_upsell_source]=...`. All lines in a cart
-    // built from that permalink are the upsell, so target them all when
-    // the attribute matches.
+    // Two conditions: cart was built from the upsell flow (cart-level
+    // attribute set by the permalink), AND the line's variant is in the
+    // configured upsell list. Second check prevents the discount from
+    // bleeding onto normal products the customer adds to the same cart
+    // after clicking the email.
     let source_matches = match input.cart().attribute() {
         Some(a) => match a.value() {
             Some(v) => matches!(
@@ -45,11 +48,20 @@ fn cart_lines_discounts_generate_run(
     if !source_matches {
         return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
     }
+    if configuration.variant_ids.is_empty() {
+        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
+    }
 
     let targets: Vec<schema::ProductDiscountCandidateTarget> = input
         .cart()
         .lines()
         .iter()
+        .filter(|l| match l.merchandise() {
+            schema::cart_lines_discounts_generate_run::input::cart::lines::Merchandise::ProductVariant(v) => {
+                configuration.variant_ids.iter().any(|id| id == v.id().as_str())
+            }
+            _ => false,
+        })
         .map(|l| {
             schema::ProductDiscountCandidateTarget::CartLine(schema::CartLineTarget {
                 id: l.id().clone(),
