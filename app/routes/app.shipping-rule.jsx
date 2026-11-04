@@ -37,27 +37,41 @@ export const action = async ({ request }) => {
 
   if (intent === "register") {
     const callbackUrl = `${process.env.SHOPIFY_APP_URL}${CALLBACK_PATH}?shop=${encodeURIComponent(session.shop)}`;
-    const res = await admin.rest.post({
-      path: "carrier_services",
-      data: {
-        carrier_service: {
-          name: SERVICE_NAME,
-          callback_url: callbackUrl,
-          service_discovery: true,
+    const res = await admin.graphql(
+      `#graphql
+      mutation CarrierServiceCreate($input: DeliveryCarrierServiceCreateInput!) {
+        carrierServiceCreate(input: $input) {
+          carrierService { id name }
+          userErrors { field message }
+        }
+      }`,
+      {
+        variables: {
+          input: {
+            name: SERVICE_NAME,
+            callbackUrl,
+            supportsServiceDiscovery: true,
+            active: true,
+          },
         },
       },
-    });
-    const body = await res.json().catch(() => ({}));
-    const serviceId = body?.carrier_service?.id ? String(body.carrier_service.id) : null;
+    );
+    const payload = await res.json();
+    const result = payload?.data?.carrierServiceCreate;
+    const userErrors = result?.userErrors ?? [];
+    if (userErrors.length) {
+      return { ok: false, error: userErrors.map((e) => e.message).join("; ") };
+    }
+    const serviceId = result?.carrierService?.id ?? null;
     if (!serviceId) {
-      return { ok: false, error: `Registration failed: ${JSON.stringify(body)}` };
+      return { ok: false, error: `Registration failed: ${JSON.stringify(payload)}` };
     }
     await prisma.shippingRule.upsert({
       where: { shop: session.shop },
       update: { serviceId },
       create: { shop: session.shop, percent: 0, serviceId },
     });
-    return { ok: true, message: `Carrier service registered (id ${serviceId}).` };
+    return { ok: true, message: `Carrier service registered (${serviceId}).` };
   }
 
   return { ok: false, error: "Unknown intent." };
