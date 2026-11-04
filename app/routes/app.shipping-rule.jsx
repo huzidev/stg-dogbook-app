@@ -78,6 +78,7 @@ export default function ShippingRule() {
         </s-paragraph>
 
         <Form method="post">
+          <input type="hidden" name="intent" value="save" />
           <s-stack gap="base">
             <s-text-field
               label="Percent"
@@ -89,7 +90,7 @@ export default function ShippingRule() {
               defaultValue={String(percent)}
               suffix="%"
             />
-            <s-button type="submit" name="intent" value="save" variant="primary" disabled={busy}>
+            <s-button type="submit" variant="primary" disabled={busy}>
               Save
             </s-button>
           </s-stack>
@@ -98,6 +99,7 @@ export default function ShippingRule() {
         <s-divider />
 
         <Form method="post">
+          <input type="hidden" name="intent" value="register" />
           <s-stack gap="base">
             <s-paragraph>
               Carrier service status:{" "}
@@ -106,7 +108,7 @@ export default function ShippingRule() {
               </s-badge>
             </s-paragraph>
             {!registered && (
-              <s-button type="submit" name="intent" value="register" disabled={busy}>
+              <s-button type="submit" disabled={busy}>
                 Register carrier service
               </s-button>
             )}
