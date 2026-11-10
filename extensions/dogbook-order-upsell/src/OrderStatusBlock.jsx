@@ -10,7 +10,7 @@
 
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 
 import { UPSELL_SOURCE_KEY } from "../../_shared/tokens.js";
 import {
@@ -22,9 +22,13 @@ import {
 
 const UPSELL_SOURCE_ORDER = "order-status";
 const OFFER_SECONDS = 24 * 3600;
-const TILE_WIDTH = "126px";
 const COVER_WIDTH = "90px";
 const COVER_HEIGHT = "118px";
+// Lay out as a single row up to this count; beyond, wrap into a 2-column grid.
+// Avoids the s-scroll-box carousel entirely — Shopify's customer-account
+// runtime hides the real scroll container inside shadow DOM, which makes
+// arrow-driven scrolling unreliable.
+const ROW_MAX = 4;
 
 export default async () => {
   render(<Extension />, document.body);
@@ -46,8 +50,6 @@ function Extension() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [added, setAdded] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(OFFER_SECONDS);
-  const tileRefs = useRef([]);
-  const scrollBoxRef = useRef(null);
 
   const myshopifyDomain = shopInfo?.myshopifyDomain;
   const purchasedLines = order?.lineItems ?? [];
@@ -88,29 +90,12 @@ function Extension() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const tile = tileRefs.current[selectedIdx];
-    if (!tile) return;
-    // ponytail: s-scroll-box hides its real scroll container inside shadow
-    // DOM, so scrollTo on the host ref no-ops. Walk up (crossing shadow
-    // boundaries via getRootNode().host) to find the ancestor that actually
-    // has horizontal overflow — that's the real scroller — and scroll it.
-    const scroller = findScroller(tile);
-    if (!scroller) return;
-    const tileRect = tile.getBoundingClientRect();
-    const scrollerRect = scroller.getBoundingClientRect();
-    const target =
-      scroller.scrollLeft +
-      (tileRect.left - scrollerRect.left) -
-      (scroller.clientWidth - tile.clientWidth) / 2;
-    if (typeof scroller.scrollTo === "function") {
-      scroller.scrollTo({ left: target, behavior: "smooth" });
-    } else {
-      scroller.scrollLeft = target;
-    }
-  }, [selectedIdx]);
-
   if (loading || !offers.length) return null;
+
+  const useGrid = offers.length > ROW_MAX;
+  const gridTemplate = useGrid
+    ? "repeat(2, minmax(0, 1fr))"
+    : `repeat(${offers.length}, minmax(0, 1fr))`;
 
   const selected = offers[selectedIdx];
   const compareAt = selected.compareAtPrice ?? selected.price;
@@ -118,9 +103,6 @@ function Extension() {
     selected.price ?? compareAt,
     discountPercent,
   );
-  const atFirst = selectedIdx === 0;
-  const atLast = selectedIdx === offers.length - 1;
-
   const addToOrder = () => {
     const variantId = String(selected.variantId).split("/").pop();
     const url = `https://${myshopifyDomain}/cart/${variantId}:1?attributes%5B${UPSELL_SOURCE_KEY}%5D=${UPSELL_SOURCE_ORDER}&attributes%5B_upsell_variant%5D=${variantId}&note=bundle_with_${encodeURIComponent(order?.name ?? "")}`;
@@ -166,109 +148,61 @@ function Extension() {
           <s-badge>$0 EXTRA SHIPPING</s-badge>
         </s-stack>
 
-        <s-scroll-box
-          ref={(el) => {
-            scrollBoxRef.current = el;
-          }}
-          overflow="auto hidden"
-          inlineSize="fill"
-        >
-          <s-grid
-            gridTemplateColumns={`repeat(${offers.length}, ${TILE_WIDTH})`}
-            gap="small-100"
-          >
-            {offers.map((o, i) => {
-              const isSelected = i === selectedIdx;
-              return (
-                <s-box
-                  key={o.variantGid}
-                  ref={(el) => {
-                    tileRefs.current[i] = el;
-                  }}
-                  padding="small-100"
-                  border="base"
-                  borderRadius="base"
-                  background={isSelected ? "subdued" : "base"}
-                >
-                  <s-stack direction="block" gap="small-200" alignInline="center">
-                    <s-clickable
-                      onclick={() => setSelectedIdx(i)}
-                      accessibility-label={o.productTitle}
+        <s-grid gridTemplateColumns={gridTemplate} gap="small-100">
+          {offers.map((o, i) => {
+            const isSelected = i === selectedIdx;
+            return (
+              <s-box
+                key={o.variantGid}
+                padding="small-100"
+                border="base"
+                borderRadius="base"
+                background={isSelected ? "subdued" : "base"}
+              >
+                <s-stack direction="block" gap="small-200" alignInline="center">
+                  <s-clickable
+                    onclick={() => setSelectedIdx(i)}
+                    accessibility-label={o.productTitle}
+                  >
+                    <s-stack
+                      direction="block"
+                      gap="small-200"
+                      alignInline="center"
                     >
-                      <s-stack
-                        direction="block"
-                        gap="small-200"
-                        alignInline="center"
+                      <s-box inlineSize={COVER_WIDTH} blockSize={COVER_HEIGHT}>
+                        {o.imageUrl ? (
+                          <s-image
+                            src={o.imageUrl}
+                            alt={o.productTitle}
+                            inlineSize="fill"
+                            blockSize="fill"
+                            objectFit="cover"
+                          />
+                        ) : (
+                          <s-box
+                            inlineSize="fill"
+                            blockSize="fill"
+                            background="subdued"
+                          >
+                            <s-text type="small">
+                              {String(i + 1).padStart(2, "0")}
+                            </s-text>
+                          </s-box>
+                        )}
+                      </s-box>
+                      <s-text
+                        type="strong"
+                        tone={isSelected ? "success" : undefined}
                       >
-                        <s-box inlineSize={COVER_WIDTH} blockSize={COVER_HEIGHT}>
-                          {o.imageUrl ? (
-                            <s-image
-                              src={o.imageUrl}
-                              alt={o.productTitle}
-                              inlineSize="fill"
-                              blockSize="fill"
-                              objectFit="cover"
-                            />
-                          ) : (
-                            <s-box
-                              inlineSize="fill"
-                              blockSize="fill"
-                              background="subdued"
-                            >
-                              <s-text type="small">
-                                {String(i + 1).padStart(2, "0")}
-                              </s-text>
-                            </s-box>
-                          )}
-                        </s-box>
-                        <s-text
-                          type="strong"
-                          tone={isSelected ? "success" : undefined}
-                        >
-                          {o.productTitle}
-                        </s-text>
-                      </s-stack>
-                    </s-clickable>
-                  </s-stack>
-                </s-box>
-              );
-            })}
-          </s-grid>
-        </s-scroll-box>
-
-        <s-stack
-          direction="inline"
-          gap="base"
-          alignItems="center"
-          justifyContent="space-between"
-        >
-          <s-text type="small" tone="neutral">
-            All breeds available — scroll to see more →
-          </s-text>
-          <s-stack direction="inline" gap="small-100" alignItems="center">
-            <s-text type="small" tone="neutral">
-              {selectedIdx + 1} / {offers.length}
-            </s-text>
-            <s-button
-              variant="secondary"
-              size="small"
-              onclick={() => !atFirst && setSelectedIdx((i) => i - 1)}
-              disabled={atFirst || undefined}
-              accessibility-label="Previous breed"
-            >
-              ←
-            </s-button>
-            <s-button
-              variant="secondary"
-              size="small"
-              onclick={() => !atLast && setSelectedIdx((i) => i + 1)}
-              disabled={atLast || undefined}
-              accessibility-label="Next breed"
-            >
-              →
-            </s-button>
-          </s-stack>
-        </s-stack>
+                        {o.productTitle}
+                      </s-text>
+                    </s-stack>
+                  </s-clickable>
+                </s-stack>
+              </s-box>
+            );
+          })}
+        </s-grid>
 
         <s-divider />
 
@@ -312,15 +246,6 @@ function Extension() {
       </s-stack>
     </s-box>
   );
-}
-
-function findScroller(fromEl) {
-  let node = fromEl?.parentElement ?? fromEl?.getRootNode?.()?.host ?? null;
-  while (node) {
-    if (node.scrollWidth > node.clientWidth + 1) return node;
-    node = node.parentElement ?? node.getRootNode?.()?.host ?? null;
-  }
-  return null;
 }
 
 function computeDiscounted(price, discountPercent) {

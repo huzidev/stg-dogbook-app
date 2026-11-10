@@ -18,7 +18,7 @@
 //   - alreadyInCart(offers, cartLineVariantGids): filters offers already
 //     present in the cart/order.
 
-export const APP_URL = "https://saves-named-again-asylum.trycloudflare.com";
+export const APP_URL = "https://stg-dogbook-app.vercel.app";
 
 const toNumeric = (gidOrId) => {
   if (gidOrId == null) return null;
