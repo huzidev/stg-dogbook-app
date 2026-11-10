@@ -6,13 +6,14 @@
 
   How it works:
     - Upsell variants come from the shop metafield
-      `app.email_upsell_variants` (list.variant_reference), written by
-      the app's admin page (`app/routes/app.post-purchase.jsx`). Edit
-      the offer there, not here.
+      `app.email_upsell_snapshot` (json), written by the app's admin page
+      (`app/routes/app.post-purchase.jsx`). Edit the offer there, not here.
     - Every tile link + the "Add to my order" CTA is a Shopify cart
-      permalink: `/cart/{variantId}:1?attributes[_upsell_source]=order-confirmation`
-      That attribute is matched by the deployed Rust Discount Function
-      which applies the configured % off.
+      permalink: `/cart/{variantId}:1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]={variantId}`.
+      The `_upsell_variant` attribute is what the Discount Function uses to
+      scope the % off to only the line the buyer actually clicked — without
+      it, any configured upsell variant added from the catalog would also
+      pick up the discount.
     - No live countdown (email can't tick); shows the end-time instead.
     - All variants render in a horizontal scroll strip. Works in Apple
       Mail, iOS Mail, and Gmail (web + mobile); Outlook falls back to
@@ -170,7 +171,7 @@
           {%- assign featured = upsell_variants.first -%}
           {%- assign featured_original = featured.price | times: 100.0 -%}
           {%- assign featured_discounted = featured.price | times: 100.0 | times: percent_remainder | divided_by: 100 -%}
-          {%- assign featured_cart_url = shop.url | append: '/cart/' | append: featured.variantId | append: ':1?attributes[_upsell_source]=order-confirmation' -%}
+          {%- assign featured_cart_url = shop.url | append: '/cart/' | append: featured.variantId | append: ':1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]=' | append: featured.variantId -%}
 
           <tr>
             <td class="px-mobile" style="padding:20px 40px 0 40px;">
@@ -212,7 +213,7 @@
                       <tr><td style="padding:0;">
                     <div style="width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; font-size:0;">
                       {%- for variant in upsell_variants -%}
-                      {%- assign v_cart_url = shop.url | append: '/cart/' | append: variant.variantId | append: ':1?attributes[_upsell_source]=order-confirmation' -%}
+                      {%- assign v_cart_url = shop.url | append: '/cart/' | append: variant.variantId | append: ':1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]=' | append: variant.variantId -%}
                       {%- if forloop.first -%}
                         {%- assign tile_border = '#2F6E3E' -%}
                         {%- assign tile_bg = '#EAF2EC' -%}

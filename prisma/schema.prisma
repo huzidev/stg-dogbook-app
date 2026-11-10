@@ -61,6 +61,25 @@ model WholesaleOrder {
   @@index([shopifyOrderId])
 }
 
+model UpsellConversion {
+  id             String   @id @default(cuid())
+  shop           String
+  shopifyOrderId String
+  orderName      String?
+  source         String
+  variantId      String
+  productTitle   String?
+  quantity       Int      @default(1)
+  linePrice      Int
+  discountAmount Int      @default(0)
+  customerEmail  String?
+  createdAt      DateTime @default(now())
+
+  @@unique([shop, shopifyOrderId])
+  @@index([shop, createdAt])
+  @@index([shop, source])
+}
+
 model WholesaleOrderItem {
   id           String  @id @default(cuid())
   orderId      String

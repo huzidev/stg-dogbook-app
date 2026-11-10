@@ -1,0 +1,19 @@
+query RunInput {
+  cart {
+    source: attribute(key: "_upsell_source") { value }
+    upsellVariant: attribute(key: "_upsell_variant") { value }
+    lines {
+      id
+      merchandise {
+        __typename
+        ... on ProductVariant { id }
+      }
+    }
+  }
+  discount {
+    discountClasses
+    metafield(namespace: "$app", key: "function-configuration") {
+      jsonValue
+    }
+  }
+}
