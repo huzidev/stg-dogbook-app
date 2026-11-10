@@ -56,12 +56,14 @@ function Extension() {
   useEffect(() => {
     if (!myshopifyDomain || !order) return;
     let cancelled = false;
+    // eslint-disable-next-line no-console
+    console.log("[upsell] raw lineItems sample:", purchasedLines[0]);
     const purchasedProductIds = purchasedLines
-      .map((li) => li.productId ?? li.merchandise?.product?.id)
+      .map((li) => li.productId ?? li.merchandise?.product?.id ?? li.product?.id)
       .filter(Boolean)
       .map(String);
     const purchasedVariantGids = purchasedLines
-      .map((li) => li.variantId ?? li.merchandise?.id)
+      .map((li) => li.variantId ?? li.merchandise?.id ?? li.variant?.id)
       .filter(Boolean);
     (async () => {
       const result = await fetchOffers(APP_URL, {
@@ -153,7 +155,7 @@ function Extension() {
       padding="base"
       border="base"
       borderRadius="base"
-      style={{ backgroundColor: "rgba(44, 109, 62, 0.05)" }}
+      background="subdued"
     >
       <s-stack direction="block" gap="base">
         <s-heading>{discountPercent}% off any book you add</s-heading>
