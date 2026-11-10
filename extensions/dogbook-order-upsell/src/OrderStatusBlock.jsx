@@ -77,9 +77,13 @@ function Extension() {
       );
       const filtered = (result.offers ?? []).filter((o) => {
         const vId = String(o.variantId ?? "").split("/").pop();
-        const pId = String(o.productId ?? "").split("/").pop();
-        return !purchasedVariantNumeric.has(vId) && !purchasedProductNumeric.has(pId);
+        if (purchasedVariantNumeric.has(vId)) return false;
+        if (o.productId == null) return true;
+        const pId = String(o.productId).split("/").pop();
+        return !purchasedProductNumeric.has(pId);
       });
+      // eslint-disable-next-line no-console
+      console.log("[upsell] offers:", result.offers?.length, "purchased variants:", [...purchasedVariantNumeric], "purchased products:", [...purchasedProductNumeric], "→ filtered:", filtered.length);
       setOffers(filtered);
       setDiscountPercent(result.discountPercent);
       setLoading(false);
