@@ -24,6 +24,23 @@
       can't track a user click-to-select).
 -->
 {%- assign upsell_variants = shop.metafields.app.email_upsell_snapshot | parse_json -%}
+{%- comment -%} Track purchased variant/product ids so upsell loops below can skip them. {%- endcomment -%}
+{%- assign purchased_ids = ',' -%}
+{%- for li in line_items -%}
+  {%- assign purchased_ids = purchased_ids | append: li.variant_id | append: ',' | append: li.product_id | append: ',' -%}
+{%- endfor -%}
+{%- assign remaining_count = 0 -%}
+{%- assign first_available_idx = -1 -%}
+{%- for v in upsell_variants -%}
+  {%- assign v_check = ',' | append: v.variantId | append: ',' -%}
+  {%- assign p_check = ',' | append: v.productId | append: ',' -%}
+  {%- unless purchased_ids contains v_check or purchased_ids contains p_check -%}
+    {%- assign remaining_count = remaining_count | plus: 1 -%}
+    {%- if first_available_idx == -1 -%}
+      {%- assign first_available_idx = forloop.index0 -%}
+    {%- endif -%}
+  {%- endunless -%}
+{%- endfor -%}
 {%- assign offer_cfg = shop.metafields.app.post_purchase_offer | parse_json -%}
 {%- assign percent = offer_cfg.discountPercent | default: 20 -%}
 {%- assign percent_remainder = 100 | minus: percent -%}
@@ -167,8 +184,8 @@
           </tr>
 
           <!-- UPSELL PANEL -->
-          {%- if upsell_variants and upsell_variants.first -%}
-          {%- assign featured = upsell_variants.first -%}
+          {%- if remaining_count > 0 -%}
+          {%- assign featured = upsell_variants[first_available_idx] -%}
           {%- assign featured_original = featured.price | times: 100.0 -%}
           {%- assign featured_discounted = featured.price | times: 100.0 | times: percent_remainder | divided_by: 100 -%}
           {%- assign featured_cart_url = shop.url | append: '/cart/' | append: featured.variantId | append: ':1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]=' | append: featured.variantId -%}
@@ -181,7 +198,7 @@
                   <td style="padding:20px;">
 
                     <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:24px; font-weight:700; color:#1E1C18; line-height:1.2;">
-                      Add a book, save {{ percent }}% off your next order
+                      {{ percent }}% off any book you add
                     </div>
 
                     <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#7B766D; margin-top:8px;">
@@ -212,9 +229,14 @@
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; table-layout:fixed; margin-top:16px;">
                       <tr><td style="padding:0;">
                     <div style="width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; font-size:0;">
+                      {%- assign tile_counter = 0 -%}
                       {%- for variant in upsell_variants -%}
+                      {%- assign v_check = ',' | append: variant.variantId | append: ',' -%}
+                      {%- assign p_check = ',' | append: variant.productId | append: ',' -%}
+                      {%- if purchased_ids contains v_check or purchased_ids contains p_check -%}{%- continue -%}{%- endif -%}
+                      {%- assign tile_counter = tile_counter | plus: 1 -%}
                       {%- assign v_cart_url = shop.url | append: '/cart/' | append: variant.variantId | append: ':1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]=' | append: variant.variantId -%}
-                      {%- if forloop.first -%}
+                      {%- if tile_counter == 1 -%}
                         {%- assign tile_border = '#2F6E3E' -%}
                         {%- assign tile_bg = '#EAF2EC' -%}
                       {%- else -%}
@@ -245,7 +267,7 @@
                           All breeds available &mdash; scroll to see more &rarr;
                         </td>
                         <td valign="middle" align="right" style="white-space:nowrap; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D; font-weight:600;">
-                          1 / {{ upsell_variants.size }}
+                          1 / {{ remaining_count }}
                         </td>
                       </tr>
                     </table>
@@ -266,7 +288,7 @@
                             style="padding:0 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; overflow:hidden;">
                           <div style="font-size:14px; font-weight:600; color:#1E1C18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ featured.productTitle }}</div>
                           <div style="font-size:14px; margin-top:4px; white-space:nowrap;">
-                            <s style="font-size:12px; color:#7B766D;">{{ featured_original | money }}</s>
+                            <s style="font-size:12px; color:#7B766D; text-decoration:line-through;">{{ featured_original | money }}</s>
                             <strong style="font-size:16px; font-weight:700; color:#1E1C18; margin-left:6px;">{{ featured_discounted | money }}</strong>
                           </div>
                         </td>

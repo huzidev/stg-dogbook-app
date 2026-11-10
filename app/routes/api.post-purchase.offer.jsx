@@ -56,7 +56,7 @@ async function hydrateVariants(admin, variantGids) {
           price
           compareAtPrice
           image { url altText }
-          product { title featuredImage { url altText } }
+          product { id title featuredImage { url altText } }
         }
       }
     }`,
@@ -68,6 +68,7 @@ async function hydrateVariants(admin, variantGids) {
     .map((n) => ({
       variantId: Number(gidToNumeric(n.id)),
       variantGid: n.id,
+      productId: n.product?.id ? Number(gidToNumeric(n.product.id)) : null,
       productTitle: n.product?.title ?? "",
       imageUrl: n.image?.url ?? n.product?.featuredImage?.url ?? null,
       price: n.price,

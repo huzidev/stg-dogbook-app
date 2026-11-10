@@ -16,7 +16,6 @@ import { UPSELL_SOURCE_KEY } from "../../_shared/tokens.js";
 import {
   APP_URL,
   fetchOffers,
-  filterNotInCart,
   formatMoney,
 } from "../../_shared/useOffers.js";
 
@@ -70,7 +69,17 @@ function Extension() {
         productIds: purchasedProductIds,
       });
       if (cancelled) return;
-      const filtered = filterNotInCart(result.offers, purchasedVariantGids);
+      const purchasedVariantNumeric = new Set(
+        purchasedVariantGids.map((g) => String(g).split("/").pop()),
+      );
+      const purchasedProductNumeric = new Set(
+        purchasedProductIds.map((p) => String(p).split("/").pop()),
+      );
+      const filtered = (result.offers ?? []).filter((o) => {
+        const vId = String(o.variantId ?? "").split("/").pop();
+        const pId = String(o.productId ?? "").split("/").pop();
+        return !purchasedVariantNumeric.has(vId) && !purchasedProductNumeric.has(pId);
+      });
       setOffers(filtered);
       setDiscountPercent(result.discountPercent);
       setLoading(false);
@@ -117,7 +126,12 @@ function Extension() {
 
   if (added) {
     return (
-      <s-box padding="base" border="base" borderRadius="base" background="subdued">
+      <s-box
+        padding="base"
+        border="base"
+        borderRadius="base"
+        style={{ backgroundColor: "rgba(44, 109, 62, 0.05)" }}
+      >
         <s-stack direction="block" gap="base" alignInline="center">
           <s-icon type="checkmark" size="large" tone="success" />
           <s-heading>Added to your order</s-heading>
@@ -131,9 +145,14 @@ function Extension() {
   }
 
   return (
-    <s-box padding="base" border="base" borderRadius="base" background="subdued">
+    <s-box
+      padding="base"
+      border="base"
+      borderRadius="base"
+      style={{ backgroundColor: "rgba(44, 109, 62, 0.05)" }}
+    >
       <s-stack direction="block" gap="base">
-        <s-heading>Add a book, save {discountPercent}% off your next order</s-heading>
+        <s-heading>{discountPercent}% off any book you add</s-heading>
 
         <s-paragraph>
           Order in the next{" "}
@@ -217,7 +236,7 @@ function Extension() {
             <s-stack direction="inline" gap="small-100">
               {compareAt && Number(compareAt) !== Number(discounted) && (
                 <s-text type="small" tone="neutral">
-                  {formatMoney(compareAt)}
+                  <del>{formatMoney(compareAt)}</del>
                 </s-text>
               )}
               <s-text type="strong">{formatMoney(discounted)}</s-text>

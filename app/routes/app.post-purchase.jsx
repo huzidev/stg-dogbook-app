@@ -78,7 +78,7 @@ async function hydrateDisplay(admin, variantGids) {
           price
           inventoryQuantity
           image { url altText }
-          product { title featuredImage { url altText } }
+          product { id title featuredImage { url altText } }
         }
       }
     }`,
@@ -90,6 +90,7 @@ async function hydrateDisplay(admin, variantGids) {
     .map((n) => ({
       id: n.id,
       numericId: gidToNumeric(n.id),
+      productId: n.product?.id ? gidToNumeric(n.product.id) : null,
       productTitle: n.product?.title ?? n.title ?? "",
       variantTitle: n.title ?? "",
       price: n.price ?? null,
@@ -288,6 +289,7 @@ export const action = async ({ request }) => {
   const hydrated = await hydrateDisplay(admin, variantGids);
   const emailSnapshot = hydrated.map((v) => ({
     variantId: v.numericId,
+    productId: v.productId,
     productTitle: v.productTitle,
     imageUrl: v.imageUrl,
     price: v.price,
@@ -375,7 +377,6 @@ export default function UpsellOffer() {
   const [active, setActive] = useState(loadedActive);
 
   const percentNum = Number(discountPercent) || 0;
-  const needsOrderStatusInstall = orderStatusStatus !== "live";
   const savedAtLabel = formatSavedAt(lastSavedAt);
 
   const [pickerReady, setPickerReady] = useState(false);
@@ -451,16 +452,7 @@ export default function UpsellOffer() {
           customer account order status page.
         </s-paragraph>
 
-        {needsOrderStatusInstall && (
-          <s-banner tone="warning" heading="Not on the order status page yet">
-            The offer is live in the confirmation email, but the app block
-            hasn&apos;t been added to the order status page. Open Settings →
-            Customize checkout → Order status and add the{" "}
-            <strong>Book Upsell</strong> block.
-          </s-banner>
-        )}
-
-        {actionData?.ok && (
+{actionData?.ok && (
           <s-banner tone="success">Saved.</s-banner>
         )}
         {actionData?.ok === false && (
