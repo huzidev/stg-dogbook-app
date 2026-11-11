@@ -206,10 +206,14 @@ function Extension() {
                     )}
                   </s-box>
                   <s-text type="strong">{o.productTitle}</s-text>
-                  <s-stack direction="inline" gap="small-100">
+                  <s-stack direction="inline" gap="small-100" alignItems="center">
                     {showCompare && (
-                      <s-text type="small" tone="neutral">
-                        <del>{formatMoney(compareAt)}</del>
+                      <s-text
+                        type="small"
+                        tone="subdued"
+                        text-decoration-line="line-through"
+                      >
+                        {formatMoney(compareAt)}
                       </s-text>
                     )}
                     <s-text type="strong">{formatMoney(discounted)}</s-text>
