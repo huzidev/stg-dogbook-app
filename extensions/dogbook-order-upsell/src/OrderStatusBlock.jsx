@@ -208,23 +208,22 @@ function Extension() {
                   <s-text type="strong">{o.productTitle}</s-text>
                   <s-stack direction="inline" gap="small-100" alignItems="center">
                     {showCompare && (
-                      <s-text
-                        type="small"
-                        tone="subdued"
-                        text-decoration-line="line-through"
-                      >
-                        {formatMoney(compareAt)}
+                      <s-text type="small" tone="subdued">
+                        {strike(formatMoney(compareAt))}
                       </s-text>
                     )}
                     <s-text type="strong">{formatMoney(discounted)}</s-text>
                   </s-stack>
-                  <s-button
-                    variant="primary"
-                    onclick={() => addToOrder(o)}
-                    accessibility-label={`Add ${o.productTitle} to my order`}
-                  >
-                    Add
-                  </s-button>
+                  <s-box inlineSize="fill">
+                    <s-button
+                      variant="primary"
+                      inlineSize="fill"
+                      onclick={() => addToOrder(o)}
+                      accessibility-label={`Add ${o.productTitle} to my order`}
+                    >
+                      Add
+                    </s-button>
+                  </s-box>
                 </s-stack>
               </s-box>
             );
@@ -245,6 +244,13 @@ function Extension() {
       </s-stack>
     </s-box>
   );
+}
+
+// ponytail: Unicode combining long stroke overlay — no HTML <del>, which the
+// customer-account surface strips inside <s-text>. Drop this when s-text gains
+// a text-decoration prop.
+function strike(str) {
+  return String(str).split("").join("̶") + "̶";
 }
 
 function computeDiscounted(price, discountPercent) {
