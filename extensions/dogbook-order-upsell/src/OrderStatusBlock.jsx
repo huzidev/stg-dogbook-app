@@ -46,7 +46,6 @@ function Extension() {
   const [offers, setOffers] = useState([]);
   const [discountPercent, setDiscountPercent] = useState(20);
   const [loading, setLoading] = useState(true);
-  const [selectedIdx, setSelectedIdx] = useState(0);
   const [added, setAdded] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(OFFER_SECONDS);
 
@@ -112,14 +111,8 @@ function Extension() {
     ? "repeat(2, minmax(0, 1fr))"
     : `repeat(${offers.length}, minmax(0, 1fr))`;
 
-  const selected = offers[selectedIdx];
-  const compareAt = selected.compareAtPrice ?? selected.price;
-  const discounted = computeDiscounted(
-    selected.price ?? compareAt,
-    discountPercent,
-  );
-  const addToOrder = () => {
-    const variantId = String(selected.variantId).split("/").pop();
+  const addToOrder = (offer) => {
+    const variantId = String(offer.variantId).split("/").pop();
     const url = `https://${myshopifyDomain}/cart/${variantId}:1?attributes%5B${UPSELL_SOURCE_KEY}%5D=${UPSELL_SOURCE_ORDER}&attributes%5B_upsell_variant%5D=${variantId}&note=bundle_with_${encodeURIComponent(order?.name ?? "")}`;
     try {
       if (shopify.navigation?.navigate) shopify.navigation.navigate(url);
@@ -127,7 +120,7 @@ function Extension() {
     } catch {
       window.top.location.href = url;
     }
-    setAdded(selected.productTitle);
+    setAdded(offer.productTitle);
   };
 
   if (added) {
@@ -175,86 +168,63 @@ function Extension() {
 
         <s-grid gridTemplateColumns={gridTemplate} gap="small-100">
           {offers.map((o, i) => {
-            const isSelected = i === selectedIdx;
+            const compareAt = o.compareAtPrice ?? o.price;
+            const discounted = computeDiscounted(
+              o.price ?? compareAt,
+              discountPercent,
+            );
+            const showCompare =
+              compareAt && Number(compareAt) !== Number(discounted);
             return (
               <s-box
                 key={o.variantGid}
                 padding="small-100"
                 border="base"
                 borderRadius="base"
-                background={isSelected ? "subdued" : "base"}
+                background="base"
               >
                 <s-stack direction="block" gap="small-200" alignInline="center">
-                  <s-clickable
-                    onclick={() => setSelectedIdx(i)}
-                    accessibility-label={o.productTitle}
-                  >
-                    <s-stack
-                      direction="block"
-                      gap="small-200"
-                      alignInline="center"
-                    >
-                      <s-box inlineSize={COVER_WIDTH} blockSize={COVER_HEIGHT}>
-                        {o.imageUrl ? (
-                          <s-image
-                            src={o.imageUrl}
-                            alt={o.productTitle}
-                            inlineSize="fill"
-                            blockSize="fill"
-                            objectFit="cover"
-                          />
-                        ) : (
-                          <s-box
-                            inlineSize="fill"
-                            blockSize="fill"
-                            background="subdued"
-                          >
-                            <s-text type="small">
-                              {String(i + 1).padStart(2, "0")}
-                            </s-text>
-                          </s-box>
-                        )}
-                      </s-box>
-                      <s-text
-                        type="strong"
-                        tone={isSelected ? "success" : undefined}
+                  <s-box inlineSize={COVER_WIDTH} blockSize={COVER_HEIGHT}>
+                    {o.imageUrl ? (
+                      <s-image
+                        src={o.imageUrl}
+                        alt={o.productTitle}
+                        inlineSize="fill"
+                        blockSize="fill"
+                        objectFit="cover"
+                      />
+                    ) : (
+                      <s-box
+                        inlineSize="fill"
+                        blockSize="fill"
+                        background="subdued"
                       >
-                        {o.productTitle}
+                        <s-text type="small">
+                          {String(i + 1).padStart(2, "0")}
+                        </s-text>
+                      </s-box>
+                    )}
+                  </s-box>
+                  <s-text type="strong">{o.productTitle}</s-text>
+                  <s-stack direction="inline" gap="small-100">
+                    {showCompare && (
+                      <s-text type="small" tone="neutral">
+                        <del>{formatMoney(compareAt)}</del>
                       </s-text>
-                    </s-stack>
-                  </s-clickable>
+                    )}
+                    <s-text type="strong">{formatMoney(discounted)}</s-text>
+                  </s-stack>
+                  <s-button
+                    variant="primary"
+                    onclick={() => addToOrder(o)}
+                    accessibility-label={`Add ${o.productTitle} to my order`}
+                  >
+                    Add
+                  </s-button>
                 </s-stack>
               </s-box>
             );
           })}
-        </s-grid>
-
-        <s-divider />
-
-        <s-grid gridTemplateColumns="auto 1fr auto" gap="base" alignItems="center">
-          <s-product-thumbnail
-            src={selected.imageUrl}
-            alt={selected.productTitle}
-            size="base"
-          />
-          <s-stack direction="block" gap="small-200">
-            <s-text type="strong">{selected.productTitle}</s-text>
-            <s-stack direction="inline" gap="small-100">
-              {compareAt && Number(compareAt) !== Number(discounted) && (
-                <s-text type="small" tone="neutral">
-                  <del>{formatMoney(compareAt)}</del>
-                </s-text>
-              )}
-              <s-text type="strong">{formatMoney(discounted)}</s-text>
-            </s-stack>
-          </s-stack>
-          <s-button
-            variant="primary"
-            onclick={addToOrder}
-            accessibility-label={`Add ${selected.productTitle} to my order`}
-          >
-            Add to my order
-          </s-button>
         </s-grid>
 
         <s-stack
