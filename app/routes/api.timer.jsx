@@ -1,75 +1,108 @@
-import { ImageResponse } from "@vercel/og";
+import satori from "satori";
+import { Resvg } from "@resvg/resvg-js";
 
-// 24-hour countdown PNG. Start timestamp is passed in the URL (`t=<unix>`)
-// by the email liquid, so we don't need storage. Every <img> request
-// recomputes `remaining = max(0, 86400 - (now - t))`, so each email open
-// renders the up-to-date time.
-
-export const config = { runtime: "edge" };
+// 24-hour countdown PNG. Start timestamp passed in URL (`t=<unix>`) so no
+// storage needed. Each email open re-renders with fresh remaining time.
+// ponytail: font fetched once at cold start; add bundled font if cold
+// starts get slow enough that the ~100ms fetch matters.
 
 const DURATION_SECONDS = 24 * 3600;
+const FONT_URL =
+  "https://github.com/rsms/inter/raw/master/docs/font-files/Inter-Bold.ttf";
+
+let fontPromise;
+const getFont = () => {
+  if (!fontPromise) {
+    fontPromise = fetch(FONT_URL).then((r) => r.arrayBuffer());
+  }
+  return fontPromise;
+};
 
 const pad = (n) => String(n).padStart(2, "0");
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
-  const start = Number(url.searchParams.get("t")) || Math.floor(Date.now() / 1000);
+  const start =
+    Number(url.searchParams.get("t")) || Math.floor(Date.now() / 1000);
   const elapsed = Math.floor(Date.now() / 1000) - start;
   const remaining = Math.max(0, DURATION_SECONDS - elapsed);
   const hh = pad(Math.floor(remaining / 3600));
   const mm = pad(Math.floor((remaining % 3600) / 60));
   const ss = pad(remaining % 60);
 
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          display: "flex",
-          width: "100%",
-          height: "100%",
-          backgroundColor: "#F2F7F3",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "sans-serif",
-        }}
-      >
-        <Cell value={hh} label="HOURS" />
-        <Sep />
-        <Cell value={mm} label="MINUTES" />
-        <Sep />
-        <Cell value={ss} label="SECONDS" />
-      </div>
-    ),
-    {
-      width: 400,
-      height: 80,
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-      },
-    },
-  );
-};
-
-function Cell({ value, label }) {
-  return (
-    <div
-      style={{
+  const cell = (value, label) => ({
+    type: "div",
+    props: {
+      style: {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         padding: "0 14px",
-      }}
-    >
-      <div style={{ fontSize: 42, color: "#2F6E3E", fontWeight: 700, lineHeight: 1 }}>
-        {value}
-      </div>
-      <div style={{ fontSize: 10, color: "#7B766D", letterSpacing: 2, marginTop: 4 }}>
-        {label}
-      </div>
-    </div>
-  );
-}
+      },
+      children: [
+        {
+          type: "div",
+          props: {
+            style: {
+              fontSize: 42,
+              color: "#2F6E3E",
+              fontWeight: 700,
+              lineHeight: 1,
+            },
+            children: value,
+          },
+        },
+        {
+          type: "div",
+          props: {
+            style: {
+              fontSize: 10,
+              color: "#7B766D",
+              letterSpacing: 2,
+              marginTop: 4,
+            },
+            children: label,
+          },
+        },
+      ],
+    },
+  });
 
-function Sep() {
-  return <div style={{ fontSize: 32, color: "#2F6E3E", fontWeight: 700 }}>:</div>;
-}
+  const sep = {
+    type: "div",
+    props: {
+      style: { fontSize: 32, color: "#2F6E3E", fontWeight: 700 },
+      children: ":",
+    },
+  };
+
+  const node = {
+    type: "div",
+    props: {
+      style: {
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#F2F7F3",
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      children: [cell(hh, "HOURS"), sep, cell(mm, "MINUTES"), sep, cell(ss, "SECONDS")],
+    },
+  };
+
+  const font = await getFont();
+  const svg = await satori(node, {
+    width: 400,
+    height: 80,
+    fonts: [{ name: "Inter", data: font, weight: 700, style: "normal" }],
+  });
+  const png = new Resvg(svg).render().asPng();
+
+  return new Response(png, {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    },
+  });
+};
