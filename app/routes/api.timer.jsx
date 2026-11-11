@@ -8,7 +8,7 @@ import { Resvg } from "@resvg/resvg-js";
 
 const DURATION_SECONDS = 24 * 3600;
 const FONT_URL =
-  "https://github.com/rsms/inter/raw/master/docs/font-files/Inter-Bold.ttf";
+  "https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-700-normal.woff";
 
 let fontPromise;
 const getFont = () => {
