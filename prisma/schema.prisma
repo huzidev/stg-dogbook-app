@@ -80,6 +80,11 @@ model UpsellConversion {
   @@index([shop, source])
 }
 
+model EmailTimer {
+  token    String   @id
+  openedAt DateTime @default(now())
+}
+
 model WholesaleOrderItem {
   id           String  @id @default(cuid())
   orderId      String
