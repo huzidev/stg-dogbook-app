@@ -1,30 +1,20 @@
 import { ImageResponse } from "@vercel/og";
-import prisma from "../db.server";
 
-// 24-hour per-email countdown PNG.
-// First request for a token stamps openedAt; subsequent requests compute
-// remaining = max(0, 86400 - (now - openedAt)) and render HH:MM:SS.
-// ponytail: email clients cache aggressively, so the "live" countdown is
-// really "live at each open". Good enough for a 24h urgency nudge.
+// 24-hour countdown PNG. Start timestamp is passed in the URL (`t=<unix>`)
+// by the email liquid, so we don't need storage. Every <img> request
+// recomputes `remaining = max(0, 86400 - (now - t))`, so each email open
+// renders the up-to-date time.
+
+export const config = { runtime: "edge" };
 
 const DURATION_SECONDS = 24 * 3600;
 
-function pad(n) {
-  return String(n).padStart(2, "0");
-}
+const pad = (n) => String(n).padStart(2, "0");
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
-  const token = (url.searchParams.get("o") || "").slice(0, 64);
-  if (!token) return new Response("missing token", { status: 400 });
-
-  const row = await prisma.emailTimer.upsert({
-    where: { token },
-    update: {},
-    create: { token },
-  });
-
-  const elapsed = Math.floor((Date.now() - row.openedAt.getTime()) / 1000);
+  const start = Number(url.searchParams.get("t")) || Math.floor(Date.now() / 1000);
+  const elapsed = Math.floor(Date.now() / 1000) - start;
   const remaining = Math.max(0, DURATION_SECONDS - elapsed);
   const hh = pad(Math.floor(remaining / 3600));
   const mm = pad(Math.floor((remaining % 3600) / 60));
@@ -40,7 +30,7 @@ export const loader = async ({ request }) => {
           backgroundColor: "#F2F7F3",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "Helvetica, Arial, sans-serif",
+          fontFamily: "sans-serif",
         }}
       >
         <Cell value={hh} label="HOURS" />
@@ -81,7 +71,5 @@ function Cell({ value, label }) {
 }
 
 function Sep() {
-  return (
-    <div style={{ fontSize: 32, color: "#2F6E3E", fontWeight: 700 }}>:</div>
-  );
+  return <div style={{ fontSize: 32, color: "#2F6E3E", fontWeight: 700 }}>:</div>;
 }

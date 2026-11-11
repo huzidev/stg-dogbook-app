@@ -53,10 +53,9 @@
   Alt:     our Vercel app at /api/timer?o=<order.id> (per-order 24h from first open).
            Swap `timer_url` if you want per-recipient countdown instead.
 {%- endcomment -%}
-{%- comment -%} CleverTimer: fixed deadline for everyone. {%- endcomment -%}
-{%- comment -%} {%- assign timer_url = 'https://img.clevertimer.org/tK9AOV6o0E4' -%} {%- endcomment -%}
-{%- comment -%} Our Vercel route: 24h per recipient, starts at first email open. {%- endcomment -%}
-{%- assign timer_url = 'https://stg-dogbook-app.vercel.app/api/timer?o=' | append: order.id -%}
+{%- comment -%} Vercel /api/timer: 24h per order, starts at email send. {%- endcomment -%}
+{%- assign send_ts = 'now' | date: '%s' -%}
+{%- assign timer_url = 'https://stg-dogbook-app.vercel.app/api/timer?t=' | append: send_ts -%}
 
 <!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
