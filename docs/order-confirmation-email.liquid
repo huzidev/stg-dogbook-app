@@ -48,12 +48,14 @@
 {%- assign offer_deadline = offer_deadline_ts | date: '%B %-d, %-l:%M %p' -%}
 {%- assign offer_deadline_iso = offer_deadline_ts | date: '%Y-%m-%dT%H:%M:%SZ' -%}
 {%- comment -%}
-  COUNTDOWN TIMER PNG — served by our Vercel app at /api/timer.
-  First image request for this order stamps openedAt; the 24h
-  window counts down from that moment. Each recipient's open is
-  tracked by order id, so forwarded emails share the forwarder's
-  countdown (fine for a 24h urgency nudge).
+  COUNTDOWN TIMER PNG.
+  Default: CleverTimer hosted URL (fixed deadline, shared across recipients).
+  Alt:     our Vercel app at /api/timer?o=<order.id> (per-order 24h from first open).
+           Swap `timer_url` if you want per-recipient countdown instead.
 {%- endcomment -%}
+{%- comment -%} CleverTimer: fixed deadline for everyone. {%- endcomment -%}
+{%- comment -%} {%- assign timer_url = 'https://img.clevertimer.org/tK9AOV6o0E4' -%} {%- endcomment -%}
+{%- comment -%} Our Vercel route: 24h per recipient, starts at first email open. {%- endcomment -%}
 {%- assign timer_url = 'https://stg-dogbook-app.vercel.app/api/timer?o=' | append: order.id -%}
 
 <!doctype html>
