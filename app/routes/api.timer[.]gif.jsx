@@ -4,18 +4,18 @@ import { Resvg } from "@resvg/resvg-js";
 import gifenc from "gifenc";
 const { GIFEncoder, quantize, applyPalette } = gifenc;
 
-// 60-minute animated countdown GIF, rendered per request.
-// 60 frames × 60s delay, loopCount=1 (plays once then freezes on last frame).
-// The 24h expiration is still computed from ?t=<unix>; the GIF is a visual
-// animation only — backend expiration remains authoritative.
-// ponytail: 60 satori+resvg frames per request ≈ 7s local / 12-18s Vercel.
-// If cold-starts blow past maxDuration=30s, drop to 30 frames.
+// Second-ticking countdown GIF, rendered per request.
+// 60 frames × 1s delay, loopCount=1 → one minute of visible second-ticking,
+// then freezes. The 24h expiration is computed from ?t=<unix>; the GIF is a
+// visual animation only — backend expiration remains authoritative.
+// ponytail: 60 satori+resvg frames ≈ 7s local / 2-3s Vercel.
 
 export const config = { maxDuration: 30 };
 
 const DURATION_SECONDS = 24 * 3600;
 const FRAME_COUNT = 60;
-const FRAME_DELAY_MS = 60 * 1000;
+const FRAME_STEP_SECONDS = 1;
+const FRAME_DELAY_MS = 1000;
 const WIDTH = 400;
 const HEIGHT = 80;
 const FONT_URL =
@@ -121,7 +121,7 @@ export const loader = async ({ request }) => {
   let palette;
 
   for (let i = 0; i < FRAME_COUNT; i++) {
-    const remaining = Math.max(0, expiresAt - (nowSec + i * 60));
+    const remaining = Math.max(0, expiresAt - (nowSec + i * FRAME_STEP_SECONDS));
     const rgba = await frameRgba(remaining, font);
     const data = new Uint8ClampedArray(
       rgba.buffer,
