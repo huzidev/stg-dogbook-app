@@ -53,9 +53,9 @@
   Alt:     our Vercel app at /api/timer?o=<order.id> (per-order 24h from first open).
            Swap `timer_url` if you want per-recipient countdown instead.
 {%- endcomment -%}
-{%- comment -%} Vercel /api/timer: 24h per order, starts at email send. {%- endcomment -%}
+{%- comment -%} Vercel /api/timer.gif: 60-frame animated GIF, 60s/frame, plays once over 1 hour. {%- endcomment -%}
 {%- assign send_ts = 'now' | date: '%s' -%}
-{%- assign timer_url = 'https://stg-dogbook-app.vercel.app/api/timer?t=' | append: send_ts -%}
+{%- assign timer_url = 'https://stg-dogbook-app.vercel.app/api/timer.gif?t=' | append: send_ts -%}
 
 <!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
