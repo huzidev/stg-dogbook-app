@@ -212,12 +212,15 @@
                       {{ percent }}% off any book you add
                     </div>
 
-                    <!-- live countdown PNG — regenerated on every image request by /api/timer. -->
+                    <!-- countdown from inboxtimer.app (hosted). Vercel timer_url kept on hold above. -->
                     <div style="margin-top:12px;">
-                      <img src="{{ timer_url }}"
-                           alt="Time left to claim {{ percent }}% off"
-                           width="400" height="80"
-                           style="display:block; max-width:100%; height:auto; border:0;">
+                      <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td align="center" style="padding:0;">
+                            <img src="https://inboxtimer.app/t/gjtin80.gif?rid={{ email }}" width="306" height="99" alt="Limited-time offer, ends soon" style="display:block;width:306px;height:auto;border:0;outline:none;text-decoration:none;">
+                          </td>
+                        </tr>
+                      </table>
                     </div>
 
                     <!-- badges -->
