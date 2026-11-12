@@ -196,10 +196,6 @@
 
           <!-- UPSELL PANEL -->
           {%- if remaining_count > 0 -%}
-          {%- assign featured = upsell_variants[first_available_idx] -%}
-          {%- assign featured_original = featured.price | times: 100.0 -%}
-          {%- assign featured_discounted = featured.price | times: 100.0 | times: percent_remainder | divided_by: 100 -%}
-          {%- assign featured_cart_url = shop.url | append: '/cart/' | append: featured.variantId | append: ':1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]=' | append: featured.variantId -%}
 
           <tr>
             <td class="px-mobile" style="padding:20px 40px 0 40px;">
@@ -212,16 +208,14 @@
                       {{ percent }}% off any book you add
                     </div>
 
-                    <!-- countdown from inboxtimer.app (hosted). Vercel timer_url kept on hold above. -->
-                    <div style="margin-top:12px;">
-                      <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
-                        <tr>
-                          <td align="center" style="padding:0;">
-                            <img src="https://inboxtimer.app/t/gjtin80.gif?rid={{ email }}" width="306" height="99" alt="Limited-time offer, ends soon" style="display:block;width:306px;height:auto;border:0;outline:none;text-decoration:none;">
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <!-- inline countdown: "Order in the next HH:MM:SS to get N% off." -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+                      <tr>
+                        <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#7B766D; line-height:1; white-space:nowrap; padding-right:6px; vertical-align:middle;">Order in the next</td>
+                        <td style="padding:6px 0 0 0; vertical-align:middle;"><img src="https://inboxtimer.app/t/gjtin80.gif?rid={{ email }}" alt="time left" width="93" height="30" style="display:block; width:93px; height:30px; border:0; outline:none; text-decoration:none;"></td>
+                        <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#7B766D; line-height:1; white-space:nowrap; padding-left:6px; vertical-align:middle;">to get {{ percent }}% off.</td>
+                      </tr>
+                    </table>
 
                     <!-- badges -->
                     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;">
@@ -240,10 +234,9 @@
                       </tr>
                     </table>
 
-                    <!-- breed scroll strip: all variants, inline-block tiles,
-                         overflow-x: auto in supporting clients, wraps in Outlook.
-                         Wrapper table forces fixed layout so inline-block content
-                         can't blow out the parent panel width. -->
+                    <!-- breed scroll strip: all variants as inline-block tiles,
+                         each with price + Add button. Horizontal scroll on
+                         supporting clients; wraps in Outlook. -->
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; table-layout:fixed; margin-top:16px;">
                       <tr><td style="padding:0;">
                     <div style="width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; font-size:0;">
@@ -254,6 +247,8 @@
                       {%- if purchased_ids contains v_check or purchased_ids contains p_check -%}{%- continue -%}{%- endif -%}
                       {%- assign tile_counter = tile_counter | plus: 1 -%}
                       {%- assign v_cart_url = shop.url | append: '/cart/' | append: variant.variantId | append: ':1?attributes[_upsell_source]=order-confirmation&attributes[_upsell_variant]=' | append: variant.variantId -%}
+                      {%- assign v_original = variant.price | times: 100.0 -%}
+                      {%- assign v_discounted = variant.price | times: 100.0 | times: percent_remainder | divided_by: 100 -%}
                       {%- if tile_counter == 1 -%}
                         {%- assign tile_border = '#2F6E3E' -%}
                         {%- assign tile_bg = '#EAF2EC' -%}
@@ -261,24 +256,30 @@
                         {%- assign tile_border = '#DED9CF' -%}
                         {%- assign tile_bg = '#FFFFFF' -%}
                       {%- endif -%}
-                      <a href="{{ v_cart_url }}"
-                         style="display:inline-block; vertical-align:top; width:126px; margin-right:8px; padding:8px; box-sizing:border-box; color:#1E1C18; background-color:{{ tile_bg }}; border:1px solid {{ tile_border }}; white-space:normal;">
-                        <div style="background-color:#F6F4EF; height:80px; line-height:80px; text-align:center;">
-                          <img src="{{ variant.imageUrl }}" width="54" height="72"
+                      <div style="display:inline-block; vertical-align:top; width:140px; margin-right:8px; padding:8px; box-sizing:border-box; background-color:{{ tile_bg }}; border:1px solid {{ tile_border }}; white-space:normal;">
+                        <div style="background-color:#F6F4EF; height:100px; line-height:100px; text-align:center;">
+                          <img src="{{ variant.imageUrl }}" width="68" height="90"
                                alt="{{ variant.productTitle | escape }} cover"
-                               style="width:54px; height:72px; object-fit:cover; display:inline-block; vertical-align:middle;">
+                               style="width:68px; height:90px; object-fit:cover; display:inline-block; vertical-align:middle;">
                         </div>
-                        <div style="padding:8px 2px 2px 2px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:11px; font-weight:600; color:#1E1C18; line-height:1.3; min-height:32px;">
+                        <div style="padding:8px 2px 4px 2px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; font-weight:700; color:#1E1C18; line-height:1.3;">
                           {{ variant.productTitle }}
                         </div>
-                      </a>
+                        <div style="padding:0 2px 8px 2px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; white-space:nowrap;">
+                          <s style="font-size:11px; color:#7B766D; text-decoration:line-through;">{{ v_original | money }}</s>
+                          <strong style="font-size:13px; font-weight:700; color:#1E1C18; margin-left:4px;">{{ v_discounted | money }}</strong>
+                        </div>
+                        <a href="{{ v_cart_url }}"
+                           style="display:block; background-color:#1E1C18; padding:8px 10px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; font-weight:700; color:#FFFFFF; text-align:center; text-decoration:none;">
+                          Add
+                        </a>
+                      </div>
                       {%- endfor -%}
                     </div>
                       </td></tr>
                     </table>
 
-                    <!-- counter row: "all breeds — scroll" + "1 / N" counter + decorative prev/next arrows
-                         (arrows are inert <span> — email can't track selection, so they're ornamental) -->
+                    <!-- counter row -->
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
                       <tr>
                         <td valign="middle" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D;">
@@ -286,35 +287,6 @@
                         </td>
                         <td valign="middle" align="right" style="white-space:nowrap; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; color:#7B766D; font-weight:600;">
                           1 / {{ remaining_count }}
-                        </td>
-                      </tr>
-                    </table>
-
-                    <!-- action row: featured (first) variant.
-                         table-layout:fixed + explicit column widths keep the
-                         CTA from spilling past the panel. -->
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                           class="upsell-action"
-                           style="width:100%; table-layout:fixed; margin-top:16px; border-top:1px solid #DED9CF; padding-top:16px;">
-                      <tr>
-                        <td class="stack" valign="middle" width="48" style="width:48px;">
-                          <img src="{{ featured.imageUrl }}" width="48" height="64"
-                               alt="{{ featured.productTitle | escape }} cover"
-                               style="width:48px; height:64px; object-fit:cover;">
-                        </td>
-                        <td class="stack" valign="middle"
-                            style="padding:0 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; overflow:hidden;">
-                          <div style="font-size:14px; font-weight:600; color:#1E1C18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ featured.productTitle }}</div>
-                          <div style="font-size:14px; margin-top:4px; white-space:nowrap;">
-                            <s style="font-size:12px; color:#7B766D; text-decoration:line-through;">{{ featured_original | money }}</s>
-                            <strong style="font-size:16px; font-weight:700; color:#1E1C18; margin-left:6px;">{{ featured_discounted | money }}</strong>
-                          </div>
-                        </td>
-                        <td class="stack" valign="middle" align="right" width="150" style="width:150px;">
-                          <a class="upsell-cta" href="{{ featured_cart_url }}"
-                             style="display:block; background-color:#1E1C18; padding:14px 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; color:#FFFFFF; text-align:center;">
-                            Add to my order
-                          </a>
                         </td>
                       </tr>
                     </table>

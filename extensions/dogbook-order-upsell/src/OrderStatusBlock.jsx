@@ -20,7 +20,7 @@ import {
 } from "../../_shared/useOffers.js";
 
 const UPSELL_SOURCE_ORDER = "order-status";
-const OFFER_SECONDS = 24 * 3600;
+const OFFER_SECONDS = 5 * 60;
 const COVER_WIDTH = "90px";
 const COVER_HEIGHT = "118px";
 // Lay out as a single row up to this count; beyond, wrap into a 2-column grid.
